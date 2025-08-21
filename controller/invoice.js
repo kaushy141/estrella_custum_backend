@@ -228,6 +228,16 @@ const controller = {
           );
         }
       }
+
+      
+      if (req?.files && req?.files["originalFiles[]"]) {
+        data.originalFilePath = req?.files["originalFiles[]"][0]?.path
+      }
+      
+      if (req?.files && req?.files["translatedFiles[]"]) {
+        data.translatedFilePath = req?.files["translatedFiles[]"][0]?.path
+      }
+      
       
       await invoice.update(data);
       const updatedInvoice = await invoice.save();
