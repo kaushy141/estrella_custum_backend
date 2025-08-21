@@ -1,5 +1,5 @@
 const multer = require("multer");
-const { getRandomDirName } = require("./commonFunction");
+const { getRandomDirName } = require("../helper/common-function");
 const fs = require("fs");
 const path = require("path");
 
