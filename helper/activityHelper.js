@@ -16,14 +16,16 @@ const activityHelper = {
   logActivity: async function(data) {
     try {
       // Validate required fields
-      if (!data.projectId || !data.groupId || !data.action || !data.description || !data.createdBy) {
+      if ( !data.groupId || !data.action || !data.description || !data.createdBy) {
         throw new Error("Missing required fields for activity logging");
       }
 
       // Verify project exists
-      const project = await Project.findByPk(data.projectId);
-      if (!project) {
-        throw new Error("Project not found for activity logging");
+      if (data.projectId) {
+        const project = await Project.findByPk(data.projectId);
+        if (!project) {
+          throw new Error("Project not found for activity logging");
+        }
       }
 
       // Verify group exists
@@ -56,7 +58,7 @@ const activityHelper = {
    */
   logUserCreation: async function(userData, createdBy) {
     return await this.logActivity({
-      projectId: userData.projectId || 1, // Default project if not specified
+      projectId: null, // Default project if not specified
       groupId: userData.groupId,
       action: "USER_CREATED",
       description: `User ${userData.firstName} ${userData.lastName} (${userData.email}) was created`,
@@ -72,7 +74,7 @@ const activityHelper = {
    */
   logGroupCreation: async function(groupData, createdBy) {
     return await this.logActivity({
-      projectId: 1, // Default project for group operations
+      projectId: null, // Default project for group operations
       groupId: groupData.id,
       action: "GROUP_CREATED",
       description: `Group "${groupData.name}" was created`,
@@ -120,7 +122,7 @@ const activityHelper = {
    */
   logShippingServiceCreation: async function(serviceData, createdBy) {
     return await this.logActivity({
-      projectId: 1, // Default project for service operations
+      projectId: null, // Default project for service operations
       groupId: serviceData.groupId,
       action: "SHIPPING_SERVICE_CREATED",
       description: `Shipping service "${serviceData.name}" was created`,
@@ -136,7 +138,7 @@ const activityHelper = {
    */
   logCustomAgentCreation: async function(agentData, createdBy) {
     return await this.logActivity({
-      projectId: 1, // Default project for agent operations
+      projectId: null, // Default project for agent operations
       groupId: agentData.groupId,
       action: "CUSTOM_AGENT_CREATED",
       description: `Custom agent "${agentData.name}" was created`,

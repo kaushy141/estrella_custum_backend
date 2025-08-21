@@ -1,9 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const customClearanceController = require("../controller/custom-clearance");
+const { uploadMiddleware } = require("../middleware/media");
 
 // Create new custom clearance
-router.post("/", customClearanceController.create);
+router.post("/", uploadMiddleware("clearance").fields([{ name: "files[]", maxCount: 10 }]), customClearanceController.create);
 
 // Get all custom clearances with pagination and filters
 router.get("/", customClearanceController.getAll);

@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const invoiceController = require("../controller/invoice");
-
+const { uploadMiddleware } = require("../middleware/media");
 // Create new invoice
-router.post("/", invoiceController.create);
+router.post("/", uploadMiddleware("invoices").fields([{ name: "files[]", maxCount: 10 }]), invoiceController.create);
 
 // Get all invoices with pagination and filters
 router.get("/", invoiceController.getAll);

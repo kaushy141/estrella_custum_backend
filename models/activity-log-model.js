@@ -17,7 +17,7 @@ const ActivityLog = sequelize.define(
     },
     projectId: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true,
     },
     groupId: {
       type: DataTypes.INTEGER,

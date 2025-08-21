@@ -1,9 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const courierReceiptController = require("../controller/courier-receipt");
+const { uploadMiddleware } = require("../middleware/media");
 
 // Create new courier receipt
-router.post("/", courierReceiptController.create);
+router.post("/", uploadMiddleware("courier").fields([{ name: "files[]", maxCount: 10 }]), courierReceiptController.create);
 
 // Get all courier receipts with pagination and filters
 router.get("/", courierReceiptController.getAll);

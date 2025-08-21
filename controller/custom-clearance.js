@@ -31,7 +31,12 @@ const controller = {
           null
         );
       }
+      let originalFilePath = null
+      if (req?.files && req?.files["files[]"]) {
+        originalFilePath = req?.files["files[]"][0]?.path
+      }
       
+      data.originalFilePath = originalFilePath
              const customClearance = await CustomClearance.create(data);
        
        // Log activity

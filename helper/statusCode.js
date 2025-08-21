@@ -1,74 +1,19 @@
-/**
- * Status codes for consistent API responses
- */
-
-const SuccessCode = {
-  OK: {
-    code: 200,
-    message: 'OK'
-  },
-  CREATED: {
-    code: 201,
-    message: 'Created successfully'
-  },
-  ACCEPTED: {
-    code: 202,
-    message: 'Accepted'
-  },
-  NO_CONTENT: {
-    code: 204,
-    message: 'No content'
-  }
-};
-
-const ErrorCode = {
-  BAD_REQUEST: {
-    code: 400,
-    message: 'Bad request'
-  },
-  UNAUTHORIZED: {
-    code: 401,
-    message: 'Unauthorized'
-  },
-  FORBIDDEN: {
-    code: 403,
-    message: 'Forbidden'
-  },
-  NOT_FOUND: {
-    code: 404,
-    message: 'Not found'
-  },
-  METHOD_NOT_ALLOWED: {
-    code: 405,
-    message: 'Method not allowed'
-  },
-  CONFLICT: {
-    code: 409,
-    message: 'Conflict'
-  },
-  UNPROCESSABLE_ENTITY: {
-    code: 422,
-    message: 'Unprocessable entity'
-  },
-  TOO_MANY_REQUESTS: {
-    code: 429,
-    message: 'Too many requests'
-  },
-  INTERNAL_SERVER_ERROR: {
-    code: 500,
-    message: 'Internal server error'
-  },
-  NOT_IMPLEMENTED: {
-    code: 501,
-    message: 'Not implemented'
-  },
-  SERVICE_UNAVAILABLE: {
-    code: 503,
-    message: 'Service unavailable'
-  }
-};
-
-module.exports = {
-  SuccessCode,
-  ErrorCode
-};
+module.exports.ErrorCode = Object.freeze({
+  INTERNAL_ERROR: 500,
+  ALREADY_EXIST: 409,
+  NOT_FOUND: 404,
+  INVALID_OTP: 400,
+  OTP_EXPIRED: 403,
+  INVALID_CREDENTIAL: 401,
+  WENT_WRONG: 501,
+  REQUEST_FAILED: 402,
+  BAD_REQUEST: 400,
+  NOT_ACCEPTABLE: 406,
+  FORBIDDEN: 403,
+  UNAUTHORIZED: 401,
+});
+module.exports.SuccessCode = Object.freeze({
+  CREATION: 201,
+  SUCCESS: 200,
+  OTP_VERIFIED: 202,
+});

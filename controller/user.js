@@ -380,6 +380,213 @@ const controller = {
         err
       );
     }
+  },
+
+  // Get user profile (current authenticated user)
+  getProfile: async function (req, res) {
+    try {
+      const userId = req.userId; // This should be set by auth middleware
+      
+      if (!userId) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.UNAUTHORIZED,
+          "User not authenticated",
+          null
+        );
+      }
+      
+      const user = await User.findByPk(userId, {
+        include: [
+          {
+            model: Group,
+            as: 'group',
+            attributes: ['id', 'name', 'logo', 'description']
+          }
+        ],
+        attributes: { exclude: ['password'] }
+      });
+      
+      if (!user) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "User not found",
+          null
+        );
+      }
+      
+      let responseData = {
+        status: "success",
+        data: user,
+      };
+      
+      return sendResponseWithData(
+        res,
+        SuccessCode.SUCCESS,
+        "User profile loaded successfully",
+        responseData
+      );
+    } catch (err) {
+      return sendResponseWithData(
+        res,
+        ErrorCode.REQUEST_FAILED,
+        "Unable to load user profile",
+        err
+      );
+    }
+  },
+
+  // Update user profile (current authenticated user)
+  updateProfile: async function (req, res) {
+    try {
+      const userId = req.userId; // This should be set by auth middleware
+      const data = req.body;
+      
+      if (!userId) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.UNAUTHORIZED,
+          "User not authenticated",
+          null
+        );
+      }
+      
+      const user = await User.findByPk(userId);
+      
+      if (!user) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "User not found",
+          null
+        );
+      }
+      
+      // Only allow updating certain fields for profile
+      const allowedFields = ['firstName', 'lastName', 'email'];
+      const updateData = {};
+      
+      allowedFields.forEach(field => {
+        if (data[field] !== undefined) {
+          updateData[field] = data[field];
+        }
+      });
+      
+      // Verify group exists if groupId is being updated
+      if (data.groupId) {
+        const group = await Group.findByPk(data.groupId);
+        if (!group) {
+          return sendResponseWithData(
+            res,
+            ErrorCode.NOT_FOUND,
+            "Group not found",
+            null
+          );
+        }
+        updateData.groupId = data.groupId;
+      }
+      
+      await user.update(updateData);
+      const updatedUser = await user.save();
+      
+      // Remove password from response
+      const userResponse = updatedUser.toJSON();
+      delete userResponse.password;
+      
+      let responseData = {
+        status: "success",
+        data: userResponse,
+      };
+      
+      return sendResponseWithData(
+        res,
+        SuccessCode.SUCCESS,
+        "User profile updated successfully",
+        responseData
+      );
+    } catch (err) {
+      return sendResponseWithData(
+        res,
+        ErrorCode.REQUEST_FAILED,
+        "Unable to update user profile",
+        err
+      );
+    }
+  },
+
+  // Change password (current authenticated user)
+  changePassword: async function (req, res) {
+    try {
+      const userId = req.userId; // This should be set by auth middleware
+      const { currentPassword, newPassword } = req.body;
+      
+      if (!userId) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.UNAUTHORIZED,
+          "User not authenticated",
+          null
+        );
+      }
+      
+      if (!currentPassword || !newPassword) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.BAD_REQUEST,
+          "Current password and new password are required",
+          null
+        );
+      }
+      
+      const user = await User.findByPk(userId);
+      
+      if (!user) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "User not found",
+          null
+        );
+      }
+      
+      // Verify current password
+      const currentPasswordHash = crypto.createHash('sha256').update(currentPassword).digest('hex');
+      if (user.password !== currentPasswordHash) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.BAD_REQUEST,
+          "Current password is incorrect",
+          null
+        );
+      }
+      
+      // Hash new password
+      const newPasswordHash = crypto.createHash('sha256').update(newPassword).digest('hex');
+      
+      // Update password
+      await user.update({ password: newPasswordHash });
+      await user.save();
+      
+      let responseData = {
+        status: "success",
+        message: "Password changed successfully"
+      };
+      
+      return sendResponseWithData(
+        res,
+        SuccessCode.SUCCESS,
+        "Password changed successfully",
+        responseData
+      );
+    } catch (err) {
+      return sendResponseWithData(
+        res,
+        ErrorCode.REQUEST_FAILED,
+        "Unable to change password",
+        err
+      );
+    }
   }
 };
 

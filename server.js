@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 3000;
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+  origin:  ['http://localhost:3000', 'http://localhost:8081', 'http://192.168.31.41:8081/', '*'],
   credentials: true
 }));
 
@@ -24,7 +24,7 @@ app.use(session(sessionConfig));
 
 // API routes
 const apiRoutes = require('./routers/index-router');
-app.use('/api', apiRoutes);
+app.use('/api/v1', apiRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

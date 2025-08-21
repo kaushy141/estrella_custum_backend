@@ -37,6 +37,7 @@
     "mysql2": "^3.14.3",
     "pg": "^8.11.3",
     "pg-hstore": "^2.3.4",
+    "pm2": "^6.0.8",
     "sequelize": "^6.35.0"
   },
   "devDependencies": {

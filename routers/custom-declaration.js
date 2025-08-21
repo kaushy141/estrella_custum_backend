@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const customDeclarationController = require("../controller/custom-declaration");
-
+const { uploadMiddleware } = require("../middleware/media");
 // Create new custom declaration
-router.post("/", customDeclarationController.create);
+router.post("/", uploadMiddleware("declaration").fields([{ name: "files[]", maxCount: 10 }]), customDeclarationController.create);
 
 // Get all custom declarations with pagination and filters
 router.get("/", customDeclarationController.getAll);

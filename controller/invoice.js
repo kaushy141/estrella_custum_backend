@@ -31,8 +31,15 @@ const controller = {
           null
         );
       }
+
+      let originalFilePath = null
+      if (req?.files && req?.files["files[]"]) {
+        originalFilePath = req?.files["files[]"][0]?.path
+      }
       
-             const invoice = await Invoice.create(data);
+      data.originalFilePath = originalFilePath
+      
+      const invoice = await Invoice.create(data);
        
        // Log activity
        try {
