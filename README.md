@@ -82,7 +82,7 @@ A comprehensive Node.js backend API built with Express.js and Sequelize ORM, fea
    # Database Configuration
    DB_HOST=localhost
    DB_PORT=5432
-   DB_NAME=estrella_db
+   DB_NAME=customs
    DB_USER=your_username
    DB_PASSWORD=your_password
    
@@ -100,7 +100,7 @@ A comprehensive Node.js backend API built with Express.js and Sequelize ORM, fea
 
 4. **Database Setup**
    - Ensure PostgreSQL is running
-   - Create the database: `CREATE DATABASE estrella_db;`
+   - Create the database: `CREATE DATABASE customs;`
    - Run migrations (if any) or let Sequelize sync the models
 
 5. **Start the server**

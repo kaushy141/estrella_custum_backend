@@ -29,7 +29,7 @@ const Group = sequelize.define(
     },
     isActive: {
       type: DataTypes.BOOLEAN,
-      defaultValue: false,
+      defaultValue: true,
       allowNull: false,
     },
   },

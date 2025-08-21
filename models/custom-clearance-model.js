@@ -1,5 +1,6 @@
 const { DataTypes } = require("sequelize");
 const { sequelize } = require("../db");
+
 //PZ Document
 const CustomClearance = sequelize.define(
   "customClearance",
@@ -17,18 +18,10 @@ const CustomClearance = sequelize.define(
     },
     projectId: {
       type: DataTypes.INTEGER,
-      references: {
-        model: "project",
-        key: "id",
-      },
       allowNull: false,
     },
     groupId: {
       type: DataTypes.INTEGER,
-      references: {
-        model: "group",
-        key: "id",
-      },
       allowNull: false,
     },
     filePath: {
@@ -61,6 +54,14 @@ const CustomClearance = sequelize.define(
     ],
   }
 );
+
+// Import models for associations
+const { Project } = require("./project-model");
+const { Group } = require("./group-model");
+
+// Define associations
+CustomClearance.belongsTo(Project, { foreignKey: 'projectId', targetKey: 'id' });
+CustomClearance.belongsTo(Group, { foreignKey: 'groupId', targetKey: 'id' });
 
 sequelize.query("SET FOREIGN_KEY_CHECKS = 0").then(function () {
   CustomClearance.sync()

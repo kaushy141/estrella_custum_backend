@@ -17,10 +17,6 @@ const GroupAddress = sequelize.define(
     },
     groupId: {
       type: DataTypes.INTEGER,
-      references: {
-        model: "group",
-        key: "id",
-      },
       allowNull: false,
     },
     address: {
@@ -82,6 +78,12 @@ const GroupAddress = sequelize.define(
     ],
   }
 );
+
+// Import Group model for association
+const { Group } = require("./group-model");
+
+// Define associations
+GroupAddress.belongsTo(Group, { foreignKey: 'groupId', targetKey: 'id' });
 
 sequelize.query("SET FOREIGN_KEY_CHECKS = 0").then(function () {
   GroupAddress.sync()

@@ -21,10 +21,6 @@ const CustomAgent = sequelize.define(
     },
     groupId: {
       type: DataTypes.INTEGER,
-      references: {
-        model: "group",
-        key: "id",
-      },
       allowNull: false,
     },
     email: {
@@ -54,6 +50,12 @@ const CustomAgent = sequelize.define(
     ],
   }
 );
+
+// Import Group model for association
+const { Group } = require("./group-model");
+
+// Define associations
+CustomAgent.belongsTo(Group, { foreignKey: 'groupId', targetKey: 'id' });
 
 sequelize.query("SET FOREIGN_KEY_CHECKS = 0").then(function () {
   CustomAgent.sync()

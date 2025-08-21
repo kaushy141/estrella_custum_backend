@@ -17,10 +17,6 @@ const User = sequelize.define(
     },
     groupId: {
       type: DataTypes.INTEGER,
-      references: {
-        model: "group",
-        key: "id",
-      },
       allowNull: false,
     },
     firstName: {
@@ -51,6 +47,7 @@ const User = sequelize.define(
     },
   },
   {
+    tableName: 'users',
     indexes: [
       {
         unique: true,
@@ -67,6 +64,12 @@ const User = sequelize.define(
     ],
   }
 );
+
+// Import Group model for association
+const { Group } = require("./group-model");
+
+// Define associations
+User.belongsTo(Group, { foreignKey: 'groupId', targetKey: 'id' });
 
 sequelize.query("SET FOREIGN_KEY_CHECKS = 0").then(function () {
   User.sync()

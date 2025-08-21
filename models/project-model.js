@@ -17,10 +17,6 @@ const Project = sequelize.define(
     },
     groupId: {
       type: DataTypes.INTEGER,
-      references: {
-        model: "group",
-        key: "id",
-      },
       allowNull: false,
     },
     title: {
@@ -54,6 +50,12 @@ const Project = sequelize.define(
     ],
   }
 );
+
+// Import Group model for association
+const { Group } = require("./group-model");
+
+// Define associations
+Project.belongsTo(Group, { foreignKey: 'groupId', targetKey: 'id' });
 
 sequelize.query("SET FOREIGN_KEY_CHECKS = 0").then(function () {
   Project.sync()

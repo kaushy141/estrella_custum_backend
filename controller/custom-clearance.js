@@ -1,8 +1,8 @@
-const { CustomClearance } = require("../models/-clearance-model");
+const { CustomClearance } = require("../models/custom-clearance-model");
 const { Project } = require("../models/project-model");
 const { Group } = require("../models/group-model");
 const { sendResponseWithData } = require("../helper/commonResponseHandler");
-const { SuccessCode, ErrorCode } = require("../helpercustom/statusCode");
+const { SuccessCode, ErrorCode } = require("../helper/statusCode");
 
 const controller = {
   // Create new custom clearance

@@ -17,18 +17,10 @@ const Invoice = sequelize.define(
     },
     projectId: {
       type: DataTypes.INTEGER,
-      references: {
-        model: "project",
-        key: "id",
-      },
       allowNull: false,
     },
     groupId: {
       type: DataTypes.INTEGER,
-      references: {
-        model: "group",
-        key: "id",
-      },
       allowNull: false,
     },
     originalFilePath: {
@@ -65,6 +57,14 @@ const Invoice = sequelize.define(
     ],
   }
 );
+
+// Import models for associations
+const { Project } = require("./project-model");
+const { Group } = require("./group-model");
+
+// Define associations
+Invoice.belongsTo(Project, { foreignKey: 'projectId', targetKey: 'id' });
+Invoice.belongsTo(Group, { foreignKey: 'groupId', targetKey: 'id' });
 
 sequelize.query("SET FOREIGN_KEY_CHECKS = 0").then(function () {
   Invoice.sync()

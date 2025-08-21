@@ -1,4 +1,5 @@
 const Sequelize = require("sequelize");
+require('dotenv').config();
 
 const Op = Sequelize.Op;
 const operatorsAliases = {
@@ -19,38 +20,33 @@ const operatorsAliases = {
   $in: Op.in,
 };
 
-// const dbConfig = {
-//   database: "customs",
-//   username: "root",
-//   password: "Kaushal@123",
-//   hostname: "localhost",
-// };
 const dbConfig = {
-  database: "customs",
-  username: "root",
-  password: "",
-  hostname: "localhost",
+  database: process.env.DB_NAME || "customs",
+  username: process.env.DB_USER || "root",
+  password: process.env.DB_PASSWORD || "",
+  hostname: process.env.DB_HOST || "localhost",
+  port: process.env.DB_PORT || 3306,
+  dialect: process.env.DB_DIALECT || "mysql"
 };
 
 const sequelize = new Sequelize(
-  dbConfig.database, //Database
-  dbConfig.username, //Username
-  dbConfig.password, //Password
+  dbConfig.database,
+  dbConfig.username,
+  dbConfig.password,
   {
-    host: dbConfig.hostname, //host
-    dialect: "mysql",
-    logging: function (str) {
-      console.log(str);
-    },
+    host: dbConfig.hostname,
+    port: dbConfig.port,
+    dialect: dbConfig.dialect,
+    logging: process.env.NODE_ENV === 'development' ? console.log : false,
     operatorsAliases,
     pool: {
       max: 5,
       min: 0,
-      acquire: 120000, // Increase the acquire timeout to 120 seconds (120000 ms)
-      idle: 10000, // The maximum time (in ms) that a connection can be idle before being released
+      acquire: 120000,
+      idle: 10000,
     },
     dialectOptions: {
-      connectTimeout: 120000, // Increase the connection timeout to 120 seconds (120000 ms)
+      connectTimeout: 120000,
     },
   }
 );

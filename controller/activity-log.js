@@ -1,5 +1,5 @@
 const { ActivityLog } = require("../models/activity-log-model");
-const { Project } = require("../models/project.model");
+const { Project } = require("../models/project-model");
 const { Group } = require("../models/group-model");
 const { sendResponseWithData } = require("../helper/commonResponseHandler");
 const { SuccessCode, ErrorCode } = require("../helper/statusCode");
