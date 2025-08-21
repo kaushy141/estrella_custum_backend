@@ -19,18 +19,18 @@ const operatorsAliases = {
   $in: Op.in,
 };
 
-const dbConfig = {
-  database: "estrella",
-  username: "root",
-  password: "Kaushal@123",
-  hostname: "localhost",
-};
 // const dbConfig = {
-//   database: "estrelladb2",
+//   database: "customs",
 //   username: "root",
-//   password: "",
+//   password: "Kaushal@123",
 //   hostname: "localhost",
 // };
+const dbConfig = {
+  database: "customs",
+  username: "root",
+  password: "",
+  hostname: "localhost",
+};
 
 const sequelize = new Sequelize(
   dbConfig.database, //Database

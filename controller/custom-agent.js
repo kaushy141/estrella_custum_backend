@@ -1,4 +1,4 @@
-const { CustomAgent } = require("../models/custum-agent-model");
+const { CustomAgent } = require("../models/custom-agent-model");
 const { Group } = require("../models/group-model");
 const { sendResponseWithData } = require("../helper/commonResponseHandler");
 const { SuccessCode, ErrorCode } = require("../helper/statusCode");
@@ -20,12 +20,20 @@ const controller = {
         );
       }
       
-      const customAgent = await CustomAgent.create(data);
-      
-      let responseData = {
-        status: "success",
-        data: customAgent,
-      };
+             const customAgent = await CustomAgent.create(data);
+       
+       // Log activity
+       try {
+         await activityHelper.logCustomAgentCreation(customAgent, req.userId || data.createdBy || 1);
+       } catch (activityError) {
+         console.error("Activity logging failed:", activityError);
+         // Don't fail the main operation if activity logging fails
+       }
+       
+       let responseData = {
+         status: "success",
+         data: customAgent,
+       };
       
       return sendResponseWithData(
         res,

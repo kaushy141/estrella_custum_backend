@@ -32,12 +32,20 @@ const controller = {
         );
       }
       
-      const courierReceipt = await CourierReceipt.create(data);
-      
-      let responseData = {
-        status: "success",
-        data: courierReceipt,
-      };
+             const courierReceipt = await CourierReceipt.create(data);
+       
+       // Log activity
+       try {
+         await activityHelper.logCourierReceiptCreation(courierReceipt, req.userId || data.createdBy || 1);
+       } catch (activityError) {
+         console.error("Activity logging failed:", activityError);
+         // Don't fail the main operation if activity logging fails
+       }
+       
+       let responseData = {
+         status: "success",
+         data: courierReceipt,
+       };
       
       return sendResponseWithData(
         res,

@@ -25,7 +25,85 @@ All API responses follow this standard format:
 
 ## Endpoints
 
-### 1. User Management
+### 1. Authentication
+
+#### User Login
+- **POST** `/auth/login`
+- **Body:**
+  ```json
+  {
+    "email": "john@example.com",
+    "password": "password123"
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "status": "success",
+    "message": "Login successful",
+    "data": {
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "user": {
+        "id": 1,
+        "firstName": "John",
+        "lastName": "Doe",
+        "email": "john@example.com",
+        "groupId": 1,
+        "isActive": true,
+        "group": {
+          "id": 1,
+          "name": "Company Name",
+          "logo": "logo.png"
+        }
+      }
+    }
+  }
+  ```
+
+#### User Logout
+- **POST** `/auth/logout`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response:**
+  ```json
+  {
+    "status": "success",
+    "message": "Logout successful"
+  }
+  ```
+
+#### Verify Token
+- **GET** `/auth/verify`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response:**
+  ```json
+  {
+    "status": "success",
+    "message": "Token verified successfully",
+    "data": {
+      "user": { /* user data */ },
+      "token": "current_token"
+    }
+  }
+  ```
+
+#### Refresh Token
+- **POST** `/auth/refresh`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response:**
+  ```json
+  {
+    "status": "success",
+    "message": "Token refreshed successfully",
+    "data": {
+      "token": "new_token",
+      "user": { /* user data */ }
+    }
+  }
+  ```
+
+---
+
+### 2. User Management
 
 #### Create User
 - **POST** `/user`
@@ -69,7 +147,7 @@ All API responses follow this standard format:
 
 ---
 
-### 2. Group Management
+### 3. Group Management
 
 #### Create Group
 - **POST** `/group`
@@ -100,7 +178,7 @@ All API responses follow this standard format:
 
 ---
 
-### 3. Project Management
+### 4. Project Management
 
 #### Create Project
 - **POST** `/project`
@@ -132,7 +210,7 @@ All API responses follow this standard format:
 
 ---
 
-### 4. Invoice Management
+### 5. Invoice Management
 
 #### Create Invoice
 - **POST** `/invoice`
@@ -168,7 +246,7 @@ All API responses follow this standard format:
 
 ---
 
-### 5. Shipping Service Management
+### 6. Shipping Service Management
 
 #### Create Shipping Service
 - **POST** `/shipping-service`
@@ -200,7 +278,7 @@ All API responses follow this standard format:
 
 ---
 
-### 6. Custom Agent Management
+### 7. Custom Agent Management
 
 #### Create Custom Agent
 - **POST** `/custom-agent`
@@ -232,7 +310,7 @@ All API responses follow this standard format:
 
 ---
 
-### 7. Custom Clearance Management
+### 8. Custom Clearance Management
 
 #### Create Custom Clearance
 - **POST** `/custom-clearance`
@@ -267,7 +345,7 @@ All API responses follow this standard format:
 
 ---
 
-### 8. Custom Declaration Management
+### 9. Custom Declaration Management
 
 #### Create Custom Declaration
 - **POST** `/custom-declaration`
@@ -302,7 +380,7 @@ All API responses follow this standard format:
 
 ---
 
-### 9. Courier Receipt Management
+### 10. Courier Receipt Management
 
 #### Create Courier Receipt
 - **POST** `/courier-receipt`
@@ -336,7 +414,7 @@ All API responses follow this standard format:
 
 ---
 
-### 10. Group Address Management
+### 11. Group Address Management
 
 #### Create Group Address
 - **POST** `/group-address`
@@ -378,6 +456,44 @@ All API responses follow this standard format:
 
 ---
 
+### 12. Activity Log Management
+
+#### Create Activity Log
+- **POST** `/activity-log`
+- **Body:**
+  ```json
+  {
+    "projectId": 1,
+    "groupId": 1,
+    "action": "USER_LOGIN",
+    "description": "User logged in successfully",
+    "createdBy": "john@example.com"
+  }
+  ```
+
+#### Get All Activity Logs
+- **GET** `/activity-log?page=1&limit=10&projectId=1&groupId=1&action=USER_LOGIN&createdBy=john@example.com`
+
+#### Get Activity Log by ID/GUID
+- **GET** `/activity-log/:id`
+
+#### Update Activity Log
+- **PUT** `/activity-log/:id`
+
+#### Delete Activity Log
+- **DELETE** `/activity-log/:id`
+
+#### Get Activity Logs by Project
+- **GET** `/activity-log/project/:projectId?page=1&limit=10&action=USER_LOGIN&createdBy=john@example.com`
+
+#### Get Activity Logs by Group
+- **GET** `/activity-log/group/:groupId?page=1&limit=10&action=USER_LOGIN&createdBy=john@example.com`
+
+#### Search Activity Logs
+- **GET** `/activity-log/search?search=login&page=1&limit=10`
+
+---
+
 ## Common Query Parameters
 
 ### Pagination
@@ -403,10 +519,13 @@ All API responses follow this standard format:
 
 ## Notes
 
-1. All endpoints support both ID and GUID for identification
-2. Pagination is implemented across all list endpoints
-3. Foreign key relationships are validated before creation/updates
-4. Soft delete is implemented for some entities (e.g., groups)
-5. Password hashing is automatically handled for user operations
-6. File paths and content are stored as strings/text fields
-7. All timestamps (createdAt, updatedAt) are automatically managed by Sequelize
+1. **Authentication**: Most endpoints require JWT authentication via `Authorization: Bearer <token>` header
+2. **Token Management**: JWT tokens expire in 24 hours and can be refreshed using `/auth/refresh`
+3. **Activity Logging**: All user actions (login, logout, CRUD operations) are automatically logged
+4. **Password Security**: Passwords are hashed using SHA-256 before storage
+5. **ID Support**: All endpoints support both ID and GUID for identification
+6. **Pagination**: Pagination is implemented across all list endpoints with `page` and `limit` parameters
+7. **Validation**: Foreign key relationships are validated before creation/updates
+8. **Soft Delete**: Soft delete is implemented for some entities (e.g., groups) using `isActive` flag
+9. **File Storage**: File paths and content are stored as strings/text fields
+10. **Timestamps**: All timestamps (createdAt, updatedAt) are automatically managed by Sequelize

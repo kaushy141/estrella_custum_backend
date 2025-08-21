@@ -2,6 +2,7 @@ const { User } = require("../models/user-model");
 const { Group } = require("../models/group-model");
 const { sendResponseWithData } = require("../helper/commonResponseHandler");
 const { SuccessCode, ErrorCode } = require("../helper/statusCode");
+const activityHelper = require("../helper/activityHelper");
 const crypto = require("crypto");
 const { Op } = require("sequelize");
 
@@ -32,6 +33,14 @@ const controller = {
       // Remove password from response
       const userResponse = user.toJSON();
       delete userResponse.password;
+      
+             // Log activity
+       try {
+         await activityHelper.logUserCreation(userResponse, req.userId || data.createdBy || 1);
+       } catch (activityError) {
+         console.error("Activity logging failed:", activityError);
+         // Don't fail the main operation if activity logging fails
+       }
       
       let responseData = {
         status: "success",

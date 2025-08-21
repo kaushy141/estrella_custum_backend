@@ -1,18 +1,27 @@
 const { Group } = require("../models/group-model");
 const { sendResponseWithData } = require("../helper/commonResponseHandler");
 const { SuccessCode, ErrorCode } = require("../helper/statusCode");
+const activityHelper = require("../helper/activityHelper");
 
 const controller = {
   // Create new group
   create: async function (req, res) {
     try {
       const data = req.body;
-      const group = await Group.create(data);
-      
-      let responseData = {
-        status: "success",
-        data: group,
-      };
+             const group = await Group.create(data);
+       
+               // Log activity
+        try {
+          await activityHelper.logGroupCreation(group, req.userId || data.createdBy || 1);
+        } catch (activityError) {
+          console.error("Activity logging failed:", activityError);
+          // Don't fail the main operation if activity logging fails
+        }
+       
+       let responseData = {
+         status: "success",
+         data: group,
+       };
       
       return sendResponseWithData(
         res,

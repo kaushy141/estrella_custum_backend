@@ -1,8 +1,8 @@
-const { CustomClearance } = require("../models/custum-clearance-model");
+const { CustomClearance } = require("../models/-clearance-model");
 const { Project } = require("../models/project-model");
 const { Group } = require("../models/group-model");
 const { sendResponseWithData } = require("../helper/commonResponseHandler");
-const { SuccessCode, ErrorCode } = require("../helper/statusCode");
+const { SuccessCode, ErrorCode } = require("../helpercustom/statusCode");
 
 const controller = {
   // Create new custom clearance
@@ -32,12 +32,20 @@ const controller = {
         );
       }
       
-      const customClearance = await CustomClearance.create(data);
-      
-      let responseData = {
-        status: "success",
-        data: customClearance,
-      };
+             const customClearance = await CustomClearance.create(data);
+       
+       // Log activity
+       try {
+         await activityHelper.logCustomClearanceCreation(customClearance, req.userId || data.createdBy || 1);
+       } catch (activityError) {
+         console.error("Activity logging failed:", activityError);
+         // Don't fail the main operation if activity logging fails
+       }
+       
+       let responseData = {
+         status: "success",
+         data: customClearance,
+       };
       
       return sendResponseWithData(
         res,

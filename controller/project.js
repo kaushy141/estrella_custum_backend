@@ -20,12 +20,20 @@ const controller = {
         );
       }
       
-      const project = await Project.create(data);
-      
-      let responseData = {
-        status: "success",
-        data: project,
-      };
+             const project = await Project.create(data);
+       
+       // Log activity
+       try {
+         await activityHelper.logProjectCreation(project, req.userId || data.createdBy || 1);
+       } catch (activityError) {
+         console.error("Activity logging failed:", activityError);
+         // Don't fail the main operation if activity logging fails
+       }
+       
+       let responseData = {
+         status: "success",
+         data: project,
+       };
       
       return sendResponseWithData(
         res,

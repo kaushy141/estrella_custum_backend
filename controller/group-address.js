@@ -21,12 +21,20 @@ const controller = {
         );
       }
       
-      const groupAddress = await GroupAddress.create(data);
-      
-      let responseData = {
-        status: "success",
-        data: groupAddress,
-      };
+             const groupAddress = await GroupAddress.create(data);
+       
+       // Log activity
+       try {
+         await activityHelper.logGroupAddressCreation(groupAddress, req.userId || data.createdBy || 1);
+       } catch (activityError) {
+         console.error("Activity logging failed:", activityError);
+         // Don't fail the main operation if activity logging fails
+       }
+       
+       let responseData = {
+         status: "success",
+         data: groupAddress,
+       };
       
       return sendResponseWithData(
         res,

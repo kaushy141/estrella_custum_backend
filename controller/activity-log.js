@@ -1,11 +1,12 @@
-const { Invoice } = require("../models/invoice-model");
-const { Project } = require("../models/project-model");
+const { ActivityLog } = require("../models/activity-log-model");
+const { Project } = require("../models/project.model");
 const { Group } = require("../models/group-model");
 const { sendResponseWithData } = require("../helper/commonResponseHandler");
 const { SuccessCode, ErrorCode } = require("../helper/statusCode");
+const { Op } = require("sequelize");
 
 const controller = {
-  // Create new invoice
+  // Create new activity log
   create: async function (req, res) {
     try {
       const data = req.body;
@@ -32,48 +33,42 @@ const controller = {
         );
       }
       
-             const invoice = await Invoice.create(data);
-       
-       // Log activity
-       try {
-         await activityHelper.logInvoiceCreation(invoice, req.userId || data.createdBy || 1);
-       } catch (activityError) {
-         console.error("Activity logging failed:", activityError);
-         // Don't fail the main operation if activity logging fails
-       }
-       
-       let responseData = {
-         status: "success",
-         data: invoice,
-       };
+      const activityLog = await ActivityLog.create(data);
+      
+      let responseData = {
+        status: "success",
+        data: activityLog,
+      };
       
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
-        "Invoice created successfully",
+        "Activity log created successfully",
         responseData
       );
     } catch (err) {
       return sendResponseWithData(
         res,
         ErrorCode.REQUEST_FAILED,
-        "Unable to create invoice",
+        "Unable to create activity log",
         err
       );
     }
   },
 
-  // Get all invoices
+  // Get all activity logs
   getAll: async function (req, res) {
     try {
-      const { page = 1, limit = 10, projectId, groupId } = req.query;
+      const { page = 1, limit = 10, projectId, groupId, action, createdBy } = req.query;
       const offset = (page - 1) * limit;
       
       let whereClause = {};
       if (projectId) whereClause.projectId = projectId;
       if (groupId) whereClause.groupId = groupId;
+      if (action) whereClause.action = { [Op.iLike]: `%${action}%` };
+      if (createdBy) whereClause.createdBy = { [Op.iLike]: `%${createdBy}%` };
       
-      const invoices = await Invoice.findAndCountAll({
+      const activityLogs = await ActivityLog.findAndCountAll({
         where: whereClause,
         include: [
           {
@@ -94,34 +89,34 @@ const controller = {
       
       let responseData = {
         status: "success",
-        data: invoices.rows,
-        count: invoices.count,
+        data: activityLogs.rows,
+        count: activityLogs.count,
         currentPage: parseInt(page),
-        totalPages: Math.ceil(invoices.count / limit)
+        totalPages: Math.ceil(activityLogs.count / limit)
       };
       
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
-        "Invoices loaded successfully",
+        "Activity logs loaded successfully",
         responseData
       );
     } catch (err) {
       return sendResponseWithData(
         res,
         ErrorCode.REQUEST_FAILED,
-        "Unable to load invoices",
+        "Unable to load activity logs",
         err
       );
     }
   },
 
-  // Get invoice by ID or GUID
+  // Get activity log by ID or GUID
   getById: async function (req, res) {
     try {
       const { id } = req.params;
       
-      const invoice = await Invoice.findOne({
+      const activityLog = await ActivityLog.findOne({
         where: {
           $or: [
             { id: id },
@@ -142,43 +137,43 @@ const controller = {
         ]
       });
       
-      if (!invoice) {
+      if (!activityLog) {
         return sendResponseWithData(
           res,
           ErrorCode.NOT_FOUND,
-          "Invoice not found",
+          "Activity log not found",
           null
         );
       }
       
       let responseData = {
         status: "success",
-        data: invoice,
+        data: activityLog,
       };
       
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
-        "Invoice loaded successfully",
+        "Activity log loaded successfully",
         responseData
       );
     } catch (err) {
       return sendResponseWithData(
         res,
         ErrorCode.REQUEST_FAILED,
-        "Unable to load invoice",
+        "Unable to load activity log",
         err
       );
     }
   },
 
-  // Update invoice
+  // Update activity log
   update: async function (req, res) {
     try {
       const { id } = req.params;
       const data = req.body;
       
-      const invoice = await Invoice.findOne({
+      const activityLog = await ActivityLog.findOne({
         where: {
           $or: [
             { id: id },
@@ -187,11 +182,11 @@ const controller = {
         }
       });
       
-      if (!invoice) {
+      if (!activityLog) {
         return sendResponseWithData(
           res,
           ErrorCode.NOT_FOUND,
-          "Invoice not found",
+          "Activity log not found",
           null
         );
       }
@@ -222,36 +217,36 @@ const controller = {
         }
       }
       
-      await invoice.update(data);
-      const updatedInvoice = await invoice.save();
+      await activityLog.update(data);
+      const updatedActivityLog = await activityLog.save();
       
       let responseData = {
         status: "success",
-        data: updatedInvoice,
+        data: updatedActivityLog,
       };
       
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
-        "Invoice updated successfully",
+        "Activity log updated successfully",
         responseData
       );
     } catch (err) {
       return sendResponseWithData(
         res,
         ErrorCode.REQUEST_FAILED,
-        "Unable to update invoice",
+        "Unable to update activity log",
         err
       );
     }
   },
 
-  // Delete invoice
+  // Delete activity log
   delete: async function (req, res) {
     try {
       const { id } = req.params;
       
-      const invoice = await Invoice.findOne({
+      const activityLog = await ActivityLog.findOne({
         where: {
           $or: [
             { id: id },
@@ -260,47 +255,51 @@ const controller = {
         }
       });
       
-      if (!invoice) {
+      if (!activityLog) {
         return sendResponseWithData(
           res,
           ErrorCode.NOT_FOUND,
-          "Invoice not found",
+          "Activity log not found",
           null
         );
       }
       
-      await invoice.destroy();
+      await activityLog.destroy();
       
       let responseData = {
         status: "success",
-        message: "Invoice deleted successfully"
+        message: "Activity log deleted successfully"
       };
       
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
-        "Invoice deleted successfully",
+        "Activity log deleted successfully",
         responseData
       );
     } catch (err) {
       return sendResponseWithData(
         res,
         ErrorCode.REQUEST_FAILED,
-        "Unable to delete invoice",
+        "Unable to delete activity log",
         err
       );
     }
   },
 
-  // Get invoices by project
+  // Get activity logs by project
   getByProject: async function (req, res) {
     try {
       const { projectId } = req.params;
-      const { page = 1, limit = 10 } = req.query;
+      const { page = 1, limit = 10, action, createdBy } = req.query;
       const offset = (page - 1) * limit;
       
-      const invoices = await Invoice.findAndCountAll({
-        where: { projectId },
+      let whereClause = { projectId };
+      if (action) whereClause.action = { [Op.iLike]: `%${action}%` };
+      if (createdBy) whereClause.createdBy = { [Op.iLike]: `%${createdBy}%` };
+      
+      const activityLogs = await ActivityLog.findAndCountAll({
+        where: whereClause,
         include: [
           {
             model: Group,
@@ -315,37 +314,41 @@ const controller = {
       
       let responseData = {
         status: "success",
-        data: invoices.rows,
-        count: invoices.count,
+        data: activityLogs.rows,
+        count: activityLogs.count,
         currentPage: parseInt(page),
-        totalPages: Math.ceil(invoices.count / limit)
+        totalPages: Math.ceil(activityLogs.count / limit)
       };
       
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
-        "Invoices loaded successfully",
+        "Activity logs loaded successfully",
         responseData
       );
     } catch (err) {
       return sendResponseWithData(
         res,
         ErrorCode.REQUEST_FAILED,
-        "Unable to load invoices",
+        "Unable to load activity logs",
         err
       );
     }
   },
 
-  // Get invoices by group
+  // Get activity logs by group
   getByGroup: async function (req, res) {
     try {
       const { groupId } = req.params;
-      const { page = 1, limit = 10 } = req.query;
+      const { page = 1, limit = 10, action, createdBy } = req.query;
       const offset = (page - 1) * limit;
       
-      const invoices = await Invoice.findAndCountAll({
-        where: { groupId },
+      let whereClause = { groupId };
+      if (action) whereClause.action = { [Op.iLike]: `%${action}%` };
+      if (createdBy) whereClause.createdBy = { [Op.iLike]: `%${createdBy}%` };
+      
+      const activityLogs = await ActivityLog.findAndCountAll({
+        where: whereClause,
         include: [
           {
             model: Project,
@@ -360,23 +363,87 @@ const controller = {
       
       let responseData = {
         status: "success",
-        data: invoices.rows,
-        count: invoices.count,
+        data: activityLogs.rows,
+        count: activityLogs.count,
         currentPage: parseInt(page),
-        totalPages: Math.ceil(invoices.count / limit)
+        totalPages: Math.ceil(activityLogs.count / limit)
       };
       
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
-        "Invoices loaded successfully",
+        "Activity logs loaded successfully",
         responseData
       );
     } catch (err) {
       return sendResponseWithData(
         res,
         ErrorCode.REQUEST_FAILED,
-        "Unable to load invoices",
+        "Unable to load activity logs",
+        err
+      );
+    }
+  },
+
+  // Search activity logs by action or description
+  search: async function (req, res) {
+    try {
+      const { search, page = 1, limit = 10 } = req.query;
+      const offset = (page - 1) * limit;
+      
+      if (!search) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.BAD_REQUEST,
+          "Search term is required",
+          null
+        );
+      }
+      
+      const activityLogs = await ActivityLog.findAndCountAll({
+        where: {
+          $or: [
+            { action: { [Op.iLike]: `%${search}%` } },
+            { description: { [Op.iLike]: `%${search}%` } },
+            { createdBy: { [Op.iLike]: `%${search}%` } }
+          ]
+        },
+        include: [
+          {
+            model: Project,
+            as: 'project',
+            attributes: ['id', 'title', 'status']
+          },
+          {
+            model: Group,
+            as: 'group',
+            attributes: ['id', 'name', 'logo']
+          }
+        ],
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        order: [['createdAt', 'DESC']]
+      });
+      
+      let responseData = {
+        status: "success",
+        data: activityLogs.rows,
+        count: activityLogs.count,
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(activityLogs.count / limit)
+      };
+      
+      return sendResponseWithData(
+        res,
+        SuccessCode.SUCCESS,
+        "Activity logs loaded successfully",
+        responseData
+      );
+    } catch (err) {
+      return sendResponseWithData(
+        res,
+        ErrorCode.REQUEST_FAILED,
+        "Unable to load activity logs",
         err
       );
     }

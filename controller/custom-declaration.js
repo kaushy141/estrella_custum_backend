@@ -1,4 +1,4 @@
-const { CustomDeclaration } = require("../models/custum-declaration-model");
+const { CustomDeclaration } = require("../models/custom-declaration-model");
 const { Project } = require("../models/project-model");
 const { Group } = require("../models/group-model");
 const { sendResponseWithData } = require("../helper/commonResponseHandler");
@@ -32,12 +32,20 @@ const controller = {
         );
       }
       
-      const customDeclaration = await CustomDeclaration.create(data);
-      
-      let responseData = {
-        status: "success",
-        data: customDeclaration,
-      };
+             const customDeclaration = await CustomDeclaration.create(data);
+       
+       // Log activity
+       try {
+         await activityHelper.logCustomDeclarationCreation(customDeclaration, req.userId || data.createdBy || 1);
+       } catch (activityError) {
+         console.error("Activity logging failed:", activityError);
+         // Don't fail the main operation if activity logging fails
+       }
+       
+       let responseData = {
+         status: "success",
+         data: customDeclaration,
+       };
       
       return sendResponseWithData(
         res,

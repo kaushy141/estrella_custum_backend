@@ -1,84 +1,62 @@
-const express = require("express");
-const session = require("express-session");
+const express = require('express');
+const session = require('express-session');
+const sessionConfig = require('./config/session');
+const cors = require('cors');
+const helmet = require('helmet');
+require('dotenv').config();
+
 const app = express();
-const multer = require("multer");
-const http = require("http");
-const server = http.createServer(app);
-const bodyParser = require("body-parser");
-const cors = require("cors");
-//const { getAllAttributes } = require("./controller/testConnection");
-const indexRouter = require("./routers/indexRouter");
-const serviceRouter = require("./services/router");
-const cookieParser = require("cookie-parser");
-const compression = require('compression');
-require("dotenv").config();
-require("./cron/cronjob");
+const PORT = process.env.PORT || 3000;
 
+// Security middleware
+app.use(helmet());
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+  credentials: true
+}));
 
-app.use(express.json({ limit: "1000mb" }));
-app.use(
-  cors({
-    allowedHeaders: ["Content-Type", "token", "authorization", "Baggage", "sentry-trace"],
-    exposedHeaders: ["token", "authorization"],
-    origin: [
-      "http://localhost:3000",
-      "http://127.0.0.1:3000",
-      "http://localhost:3001",
-      "http://localhost:3002",
-      "http://localhost:3003",
-      "http://dashboard.estrellajewels.com",
-      "https://dashboard.estrellajewels.com",
-      "http://estrellaestrellajewels.com",
-      "https://estrellajewels.com",
-      "http://www.estrellajewels.com",
-      "https://www.estrellajewels.com",
-    ],
-    credentials: true,
-    methods: "GET, HEAD, PUT, PATCH, POST, DELETE",
-    preflightContinue: false,
-  })
-);
+// Body parsing middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-app.use(
-  session({
-    secret: process.env.SESSION_KEY, // Replace with your secret key
-    resave: false,
-    saveUninitialized: true,
-    cookie: { secure: false }, // Set to `true` if you are using HTTPS
-  })
-);
+// Session middleware (must be before routes)
+app.use(session(sessionConfig));
 
-app.use(cookieParser());
-app.use(bodyParser.json({ limit: 2000000 }));
-app.use(bodyParser.urlencoded({ limit: 2000000, extended: true }));
+// API routes
+const apiRoutes = require('./routers/index-router');
+app.use('/api', apiRoutes);
 
-// app.get("/", (req, res) => {
-//   getAllAttributes(req, res);
-// });
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    sessionId: req.sessionID 
+  });
+});
 
-app.use("/media", express.static("media"));
-app.use("/api/v1", indexRouter);
-app.use("/api/services", serviceRouter);
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Global error handler:', err);
+  res.status(500).json({
+    status: 'error',
+    message: 'Internal server error',
+    error: process.env.NODE_ENV === 'development' ? err.message : {}
+  });
+});
 
-app.use(compression({ filter: shouldCompress }))
-
-function shouldCompress(req, res) {
-  if (req.headers['x-no-compression']) {
-    // don't compress responses with this request header
-    return false
-  }
-
-  // fallback to standard filter function
-  return compression.filter(req, res)
-}
-
-app.use((req, res) => {
+// 404 handler
+app.use('*', (req, res) => {
   res.status(404).json({
-    message: "Route didn't found",
-  }); // Send a 404 status with a custom message
+    status: 'error',
+    message: 'Route not found'
+  });
 });
-const port = 3001;
-server.listen(port, () => {
-  console.log("server is running on port :", port);
-  // console.log("Environment",global.gConfig.environmentConfig);
+
+app.listen(PORT, () => {
+  console.log(`🚀 Estrella Custom Backend server running on port ${PORT}`);
+  console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  console.log(`🔐 API endpoints: http://localhost:${PORT}/api`);
 });
+
+module.exports = app;
