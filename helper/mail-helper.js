@@ -48,8 +48,8 @@ const SENDING = true;
 //   host: "smtp.mailgun.org",
 //   port: 587,
 //   auth: {
-//     user: "postmaster@mg.estrella.com",
-//     pass: "9bae477c2fd25f72010df699997aa657-86220e6a-00ff5872",
+//     user: "",
+//     pass: "",
 //   },
 // };
 
@@ -57,8 +57,8 @@ const SENDING = true;
 //   host: "smtp.mailgun.org",
 //   port: 587,
 //   auth: {
-//     user: "postmaster@sandboxe5f7281ad30f42bd928c296a1a68c4c6.mailgun.org",
-//     pass: "7902fc312c5649e9cabb080a2e58da48-2175ccc2-6771b418",
+//     user: "",
+//     pass: "",
 //   },
 // };
 
