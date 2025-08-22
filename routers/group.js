@@ -19,5 +19,6 @@ router.delete("/:id", groupController.delete);
 
 // Deactivate group (soft delete)
 router.patch("/:id/deactivate", groupController.deactivate);
+router.patch("/:id/activate", groupController.activate);
 
 module.exports = router;

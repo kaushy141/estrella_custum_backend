@@ -264,6 +264,51 @@ const controller = {
         err
       );
     }
+  },
+  activate: async function (req, res) {
+    try {
+      const { id } = req.params;
+      
+      const group = await Group.findOne({
+        where: {
+          $or: [
+            { id: id },
+            { guid: id }
+          ]
+        }
+      });
+      
+      if (!group) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Group not found",
+          null
+        );
+      }
+      
+      await group.update({ isActive: false });
+      const updatedGroup = await group.save();
+      
+      let responseData = {
+        status: "success",
+        data: updatedGroup,
+      };
+      
+      return sendResponseWithData(
+        res,
+        SuccessCode.SUCCESS,
+        "Group deactivated successfully",
+        responseData
+      );
+    } catch (err) {
+      return sendResponseWithData(
+        res,
+        ErrorCode.REQUEST_FAILED,
+        "Unable to deactivate group",
+        err
+      );
+    }
   }
 };
 
