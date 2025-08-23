@@ -27,6 +27,10 @@ const Project = sequelize.define(
       type: DataTypes.STRING(255),
       allowNull: true,
     },
+    aiConversation: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
     status: {
       type: DataTypes.STRING(255),
       allowNull: false,

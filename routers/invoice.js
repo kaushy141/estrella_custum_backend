@@ -12,7 +12,7 @@ router.get("/", invoiceController.getAll);
 router.get("/:id", invoiceController.getById);
 
 // Update invoice
-router.put("/:id", invoiceController.update);
+router.put("/:id", uploadMiddleware("invoices").fields([{ name: "originalFiles[]", maxCount: 10 }, { name: "translatedFiles[]", maxCount: 10 }]), invoiceController.update);
 
 // Delete invoice
 router.delete("/:id", invoiceController.delete);
