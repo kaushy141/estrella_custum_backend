@@ -287,7 +287,7 @@ const controller = {
         );
       }
       
-      await group.update({ isActive: false });
+      await group.update({ isActive: true });
       const updatedGroup = await group.save();
       
       let responseData = {
@@ -298,14 +298,14 @@ const controller = {
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
-        "Group deactivated successfully",
+        "Group activated successfully",
         responseData
       );
     } catch (err) {
       return sendResponseWithData(
         res,
         ErrorCode.REQUEST_FAILED,
-        "Unable to deactivate group",
+        "Unable to activate group",
         err
       );
     }
