@@ -2,13 +2,13 @@ const { Project } = require("../models/project-model");
 const { Group } = require("../models/group-model");
 const { sendResponseWithData } = require("../helper/commonResponseHandler");
 const { SuccessCode, ErrorCode } = require("../helper/statusCode");
+const activityHelper = require("../helper/activityHelper");
 
 const controller = {
   // Create new project
   create: async function (req, res) {
     try {
       const data = req.body;
-      
       // Verify group exists
       const group = await Group.findByPk(data.groupId);
       if (!group) {
@@ -19,22 +19,20 @@ const controller = {
           null
         );
       }
-      
-             const project = await Project.create(data);
-       
-       // Log activity
-       try {
-         await activityHelper.logProjectCreation(project, req.userId || data.createdBy || 1);
-       } catch (activityError) {
-         console.error("Activity logging failed:", activityError);
-         // Don't fail the main operation if activity logging fails
-       }
-       
-       let responseData = {
-         status: "success",
-         data: project,
-       };
-      
+      const project = await Project.create(data);
+      // Log activity
+      try {
+        await activityHelper.logProjectCreation(project, req.userId || data.createdBy || 1);
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
+
+      let responseData = {
+        status: "success",
+        data: project,
+      };
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -56,14 +54,14 @@ const controller = {
     try {
       const { page = 1, limit = 10, groupId, status, isActive } = req.query;
       const offset = (page - 1) * limit;
-      
+
       let whereClause = {};
       if (groupId) whereClause.groupId = groupId;
       if (status) whereClause.status = status;
       if (isActive !== undefined) {
         whereClause.isActive = isActive === 'true';
       }
-      
+
       const projects = await Project.findAndCountAll({
         where: whereClause,
         include: [
@@ -77,7 +75,7 @@ const controller = {
         offset: parseInt(offset),
         order: [['createdAt', 'DESC']]
       });
-      
+
       let responseData = {
         status: "success",
         data: projects.rows,
@@ -85,7 +83,7 @@ const controller = {
         currentPage: parseInt(page),
         totalPages: Math.ceil(projects.count / limit)
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -106,7 +104,7 @@ const controller = {
   getById: async function (req, res) {
     try {
       const { id } = req.params;
-      
+
       const project = await Project.findOne({
         where: {
           $or: [
@@ -122,7 +120,7 @@ const controller = {
           }
         ]
       });
-      
+
       if (!project) {
         return sendResponseWithData(
           res,
@@ -131,12 +129,12 @@ const controller = {
           null
         );
       }
-      
+
       let responseData = {
         status: "success",
         data: project,
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -158,7 +156,7 @@ const controller = {
     try {
       const { id } = req.params;
       const data = req.body;
-      
+
       const project = await Project.findOne({
         where: {
           $or: [
@@ -167,7 +165,7 @@ const controller = {
           ]
         }
       });
-      
+
       if (!project) {
         return sendResponseWithData(
           res,
@@ -176,7 +174,7 @@ const controller = {
           null
         );
       }
-      
+
       // Verify group exists if groupId is being updated
       if (data.groupId) {
         const group = await Group.findByPk(data.groupId);
@@ -189,15 +187,15 @@ const controller = {
           );
         }
       }
-      
+
       await project.update(data);
       const updatedProject = await project.save();
-      
+
       let responseData = {
         status: "success",
         data: updatedProject,
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -218,7 +216,7 @@ const controller = {
   delete: async function (req, res) {
     try {
       const { id } = req.params;
-      
+
       const project = await Project.findOne({
         where: {
           $or: [
@@ -227,7 +225,7 @@ const controller = {
           ]
         }
       });
-      
+
       if (!project) {
         return sendResponseWithData(
           res,
@@ -236,14 +234,14 @@ const controller = {
           null
         );
       }
-      
+
       await project.destroy();
-      
+
       let responseData = {
         status: "success",
         message: "Project deleted successfully"
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -266,20 +264,20 @@ const controller = {
       const { groupId } = req.params;
       const { page = 1, limit = 10, status, isActive } = req.query;
       const offset = (page - 1) * limit;
-      
+
       let whereClause = { groupId };
       if (status) whereClause.status = status;
       if (isActive !== undefined) {
         whereClause.isActive = isActive === 'true';
       }
-      
+
       const projects = await Project.findAndCountAll({
         where: whereClause,
         limit: parseInt(limit),
         offset: parseInt(offset),
         order: [['createdAt', 'DESC']]
       });
-      
+
       let responseData = {
         status: "success",
         data: projects.rows,
@@ -287,7 +285,7 @@ const controller = {
         currentPage: parseInt(page),
         totalPages: Math.ceil(projects.count / limit)
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,

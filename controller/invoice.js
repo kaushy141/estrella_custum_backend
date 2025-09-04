@@ -61,6 +61,7 @@ const controller = {
         responseData
       );
     } catch (err) {
+      console.error("Invoice creation failed:", err);
       return sendResponseWithData(
         res,
         ErrorCode.REQUEST_FAILED,
