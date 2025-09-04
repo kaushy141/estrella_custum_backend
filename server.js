@@ -17,6 +17,7 @@ app.use(cors({
 
 // Body parsing middleware
 app.use(express.json());
+
 app.use(express.urlencoded({ extended: true }));
 
 // Session middleware (must be before routes)

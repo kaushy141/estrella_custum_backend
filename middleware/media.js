@@ -13,6 +13,7 @@ function uploadMiddleware(folderName, namePrefix = null) {
           cb(null, path2);
         },
 
+        
         // By default, multer removes file extensions so let's add them back
         filename: function (req, file, cb) {
           cb(
