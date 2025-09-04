@@ -3,13 +3,12 @@ const { Project } = require("../models/project-model");
 const { Group } = require("../models/group-model");
 const { sendResponseWithData } = require("../helper/commonResponseHandler");
 const { SuccessCode, ErrorCode } = require("../helper/statusCode");
-
+const activityHelper = require("../helper/activityHelper");
 const controller = {
   // Create new invoice
   create: async function (req, res) {
     try {
       const data = req.body;
-      
       // Verify project exists
       const project = await Project.findByPk(data.projectId);
       if (!project) {
@@ -20,7 +19,6 @@ const controller = {
           null
         );
       }
-      
       // Verify group exists
       const group = await Group.findByPk(data.groupId);
       if (!group) {
@@ -38,8 +36,16 @@ const controller = {
       }
       
       data.originalFilePath = originalFilePath
+      // }}}}}}}}}} just for testing
+      data.translatedFilePath = originalFilePath
+      data.originalFileContent = "lorem ipsum dolor sit amet"
+      data.translatedFileContent = "lorem ipsum dolor sit amet"
+
+
+      // }}}}}}}}}}}}}
       
       const invoice = await Invoice.create(data);
+
        
        // Log activity
        try {

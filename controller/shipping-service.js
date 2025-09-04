@@ -8,7 +8,7 @@ const controller = {
   create: async function (req, res) {
     try {
       const data = req.body;
-      
+
       // Verify group exists
       const group = await Group.findByPk(data.groupId);
       if (!group) {
@@ -19,22 +19,20 @@ const controller = {
           null
         );
       }
-      
-             const shippingService = await ShippingService.create(data);
-       
-       // Log activity
-       try {
-         await activityHelper.logShippingServiceCreation(shippingService, req.userId || data.createdBy || 1);
-       } catch (activityError) {
-         console.error("Activity logging failed:", activityError);
-         // Don't fail the main operation if activity logging fails
-       }
-       
-       let responseData = {
-         status: "success",
-         data: shippingService,
-       };
-      
+      const shippingService = await ShippingService.create(data);
+      // Log activity
+      try {
+        await activityHelper.logShippingServiceCreation(shippingService, req.userId || data.createdBy || 1);
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
+
+      let responseData = {
+        status: "success",
+        data: shippingService,
+      };
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -56,13 +54,13 @@ const controller = {
     try {
       const { page = 1, limit = 10, groupId, isActive } = req.query;
       const offset = (page - 1) * limit;
-      
+
       let whereClause = {};
       if (groupId) whereClause.groupId = groupId;
       if (isActive !== undefined) {
         whereClause.isActive = isActive === 'true';
       }
-      
+
       const shippingServices = await ShippingService.findAndCountAll({
         where: whereClause,
         include: [
@@ -76,7 +74,7 @@ const controller = {
         offset: parseInt(offset),
         order: [['createdAt', 'DESC']]
       });
-      
+
       let responseData = {
         status: "success",
         data: shippingServices.rows,
@@ -84,7 +82,7 @@ const controller = {
         currentPage: parseInt(page),
         totalPages: Math.ceil(shippingServices.count / limit)
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -105,7 +103,7 @@ const controller = {
   getById: async function (req, res) {
     try {
       const { id } = req.params;
-      
+
       const shippingService = await ShippingService.findOne({
         where: {
           $or: [
@@ -121,7 +119,7 @@ const controller = {
           }
         ]
       });
-      
+
       if (!shippingService) {
         return sendResponseWithData(
           res,
@@ -130,12 +128,12 @@ const controller = {
           null
         );
       }
-      
+
       let responseData = {
         status: "success",
         data: shippingService,
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -157,7 +155,7 @@ const controller = {
     try {
       const { id } = req.params;
       const data = req.body;
-      
+
       const shippingService = await ShippingService.findOne({
         where: {
           $or: [
@@ -166,7 +164,7 @@ const controller = {
           ]
         }
       });
-      
+
       if (!shippingService) {
         return sendResponseWithData(
           res,
@@ -175,7 +173,7 @@ const controller = {
           null
         );
       }
-      
+
       // Verify group exists if groupId is being updated
       if (data.groupId) {
         const group = await Group.findByPk(data.groupId);
@@ -188,15 +186,15 @@ const controller = {
           );
         }
       }
-      
+
       await shippingService.update(data);
       const updatedShippingService = await shippingService.save();
-      
+
       let responseData = {
         status: "success",
         data: updatedShippingService,
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -217,7 +215,7 @@ const controller = {
   delete: async function (req, res) {
     try {
       const { id } = req.params;
-      
+
       const shippingService = await ShippingService.findOne({
         where: {
           $or: [
@@ -226,7 +224,7 @@ const controller = {
           ]
         }
       });
-      
+
       if (!shippingService) {
         return sendResponseWithData(
           res,
@@ -235,14 +233,14 @@ const controller = {
           null
         );
       }
-      
+
       await shippingService.destroy();
-      
+
       let responseData = {
         status: "success",
         message: "Shipping service deleted successfully"
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -265,19 +263,19 @@ const controller = {
       const { groupId } = req.params;
       const { page = 1, limit = 10, isActive } = req.query;
       const offset = (page - 1) * limit;
-      
+
       let whereClause = { groupId };
       if (isActive !== undefined) {
         whereClause.isActive = isActive === 'true';
       }
-      
+
       const shippingServices = await ShippingService.findAndCountAll({
         where: whereClause,
         limit: parseInt(limit),
         offset: parseInt(offset),
         order: [['createdAt', 'DESC']]
       });
-      
+
       let responseData = {
         status: "success",
         data: shippingServices.rows,
@@ -285,7 +283,7 @@ const controller = {
         currentPage: parseInt(page),
         totalPages: Math.ceil(shippingServices.count / limit)
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,

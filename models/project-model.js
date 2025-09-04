@@ -62,7 +62,7 @@ const { Group } = require("./group-model");
 Project.belongsTo(Group, { foreignKey: 'groupId', targetKey: 'id' });
 
 sequelize.query("SET FOREIGN_KEY_CHECKS = 0").then(function () {
-Project.sync({alter: true})
+Project.sync()
     .then(() => {
       sequelize.query("SET FOREIGN_KEY_CHECKS = 1").then(function () {
         console.log("Project table created successfully!");

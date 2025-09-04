@@ -13,7 +13,7 @@ const Invoice = sequelize.define(
     guid: {
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
-      allowNull: false,
+      allowNull: true,
     },
     projectId: {
       type: DataTypes.INTEGER,
@@ -29,15 +29,15 @@ const Invoice = sequelize.define(
     },
     translatedFilePath: {
       type: DataTypes.STRING(255),
-      allowNull: false,
+      allowNull: true,
     },
     originalFileContent: {
       type: DataTypes.TEXT,
-      allowNull: false,
+      allowNull: true,
     },
     translatedFileContent: {
       type: DataTypes.TEXT,
-      allowNull: false,
+      allowNull: true,
     },
   },
   {
