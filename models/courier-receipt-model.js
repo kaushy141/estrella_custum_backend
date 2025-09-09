@@ -27,9 +27,17 @@ const CourierReceipt = sequelize.define(
       type: DataTypes.STRING(255),
       allowNull: false,
     },
+    fileName: {
+      type: DataTypes.STRING(100),
+      allowNull: false,
+    },
     fileContent: {
       type: DataTypes.TEXT,
-      allowNull: false,
+      allowNull: true,
+    },
+    insights: {
+      type: DataTypes.TEXT,
+      allowNull: true,
     },
   },
   {

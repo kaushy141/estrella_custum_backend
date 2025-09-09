@@ -304,7 +304,14 @@ const commonHelper = {
     html += `</table>`
     html += `</div>`
     return html;
-  }
+  },
+    awaitFunction: async (time = 3000) => {
+        return new Promise((resolve, reject) => {
+            setTimeout(() => {
+                resolve();
+            }, time);
+        });
+    },
 
 };
 module.exports = commonHelper;

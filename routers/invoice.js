@@ -23,4 +23,7 @@ router.get("/project/:projectId", invoiceController.getByProject);
 // Get invoices by group
 router.get("/group/:groupId", invoiceController.getByGroup);
 
+// Translate invoice
+router.post("/translate/:id", invoiceController.translate);
+
 module.exports = router;
