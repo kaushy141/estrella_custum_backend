@@ -29,7 +29,7 @@ const CourierReceipt = sequelize.define(
     },
     fileName: {
       type: DataTypes.STRING(100),
-      allowNull: false,
+      allowNull: true,
     },
     fileContent: {
       type: DataTypes.TEXT,
@@ -67,7 +67,7 @@ CourierReceipt.belongsTo(Project, { foreignKey: 'projectId', targetKey: 'id' });
 CourierReceipt.belongsTo(Group, { foreignKey: 'groupId', targetKey: 'id' });
 
 sequelize.query("SET FOREIGN_KEY_CHECKS = 0").then(function () {
-  CourierReceipt.sync()
+  CourierReceipt.sync({ alter: true })
     .then(() => {
       sequelize.query("SET FOREIGN_KEY_CHECKS = 1").then(function () {
         console.log("CourierReceipt table created successfully!");

@@ -3,6 +3,8 @@ const { Project } = require("../models/project-model");
 const { Group } = require("../models/group-model");
 const { sendResponseWithData } = require("../helper/commonResponseHandler");
 const { SuccessCode, ErrorCode } = require("../helper/statusCode");
+const { Op } = require("sequelize");
+const activityHelper = require("../helper/activityHelper");
 
 const controller = {
   // Create new courier receipt
@@ -11,7 +13,7 @@ const controller = {
       const data = req.body;
 
       // Verify project exists
-      const project = await Project.findByPk({ guid: data.projectId });
+      const project = await Project.findOne({ guid: data.projectId });
       if (!project) {
         return sendResponseWithData(
           res,
@@ -22,7 +24,7 @@ const controller = {
       }
 
       // Verify group exists
-      const group = await Group.findByPk(data.groupId);
+      const group = await Group.findOne({ guid: data.groupId });
       if (!group) {
         return sendResponseWithData(
           res,
@@ -35,8 +37,15 @@ const controller = {
       if (req?.files && req?.files["files[]"]) {
         originalFilePath = req?.files["files[]"][0]?.path;
       }
+      let fileName = null;
+      if (req?.files && req?.files["files[]"]) {
+        fileName = req?.files["files[]"][0]?.filename;
+      }
 
-      data.originalFilePath = originalFilePath;
+      data.filePath = originalFilePath;
+      data.fileName = fileName;
+      data.projectId = project.id; // Use the actual project ID, not GUID
+      data.groupId = group.id; // Use the actual group ID, not GUID
       const courierReceipt = await CourierReceipt.create(data);
 
       // Log activity
@@ -62,6 +71,7 @@ const controller = {
         responseData
       );
     } catch (err) {
+      console.error("Error creating courier receipt:", err);
       return sendResponseWithData(
         res,
         ErrorCode.REQUEST_FAILED,
@@ -131,7 +141,7 @@ const controller = {
 
       const courierReceipt = await CourierReceipt.findOne({
         where: {
-          $or: [{ id: id }, { guid: id }],
+          [Op.or]: [{ guid: id }],
         },
         include: [
           {
@@ -185,7 +195,7 @@ const controller = {
 
       const courierReceipt = await CourierReceipt.findOne({
         where: {
-          $or: [{ id: id }, { guid: id }],
+          [Op.or]: [{ id: id }, { guid: id }],
         },
       });
 
@@ -255,7 +265,7 @@ const controller = {
 
       const courierReceipt = await CourierReceipt.findOne({
         where: {
-          $or: [{ id: id }, { guid: id }],
+          [Op.or]: [{ id: id }, { guid: id }],
         },
       });
 
