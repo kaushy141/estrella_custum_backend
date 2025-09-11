@@ -9,9 +9,8 @@ const controller = {
   create: async function (req, res) {
     try {
       const data = req.body;
-
       // Verify project exists
-      const project = await Project.findByPk(data.projectId);
+      const project = await Project.findOne({ where: { guid: data.projectId } });
       if (!project) {
         return sendResponseWithData(
           res,
@@ -22,7 +21,7 @@ const controller = {
       }
 
       // Verify group exists
-      const group = await Group.findByPk(data.groupId);
+      const group = await Group.findOne({ where: { guid: data.groupId } });
       if (!group) {
         return sendResponseWithData(
           res,
@@ -31,6 +30,7 @@ const controller = {
           null
         );
       }
+  
       let originalFilePath = null;
       if (req?.files && req?.files["files[]"]) {
         originalFilePath = req?.files["files[]"][0]?.path;
@@ -39,7 +39,8 @@ const controller = {
       if (req?.files && req?.files["files[]"]) {
         fileName = req?.files["files[]"][0]?.filename;
       }
-
+      data.projectId = project.id;
+      data.groupId = group.id;
       data.filePath = originalFilePath;
       data.fileName = fileName;
       const customDeclaration = await CustomDeclaration.create(data);

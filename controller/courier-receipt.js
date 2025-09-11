@@ -87,9 +87,27 @@ const controller = {
       const { page = 1, limit = 10, projectId, groupId } = req.query;
       const offset = (page - 1) * limit;
 
+      const project = await Project.findOne({ where: { guid: projectId } });
+      const group = await Group.findOne({ where: { guid: groupId } });
+      if (!project) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Project not found",
+          null
+        );
+      }
+      if (!group) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Group not found",
+          null
+        );
+      }
       let whereClause = {};
-      if (projectId) whereClause.projectId = projectId;
-      if (groupId) whereClause.groupId = groupId;
+      if (projectId) whereClause.projectId = project.id;
+      if (groupId) whereClause.groupId = group.id;
 
       const courierReceipts = await CourierReceipt.findAndCountAll({
         where: whereClause,

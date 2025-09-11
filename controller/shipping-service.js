@@ -55,8 +55,17 @@ const controller = {
       const { page = 1, limit = 10, groupId, isActive } = req.query;
       const offset = (page - 1) * limit;
 
+      const group = await Group.findOne({ where: { guid: groupId } });
+      if (!group) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Group not found",
+          null
+        );
+      }
       let whereClause = {};
-      if (groupId) whereClause.groupId = groupId;
+      if (groupId) whereClause.groupId = group.id;
       if (isActive !== undefined) {
         whereClause.isActive = isActive === 'true';
       }
