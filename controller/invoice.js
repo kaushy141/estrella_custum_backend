@@ -430,22 +430,22 @@ const controller = {
           }
         );
         // call the translate api
-        const translatedInvoice = await translateDocument({
-          taskId: "Invoice",
-          filePath: invoice.originalFilePath,
-          fileName: invoice.originalFileName,
-          language: language,
-        });
-        await invoice.update(
-          {
-            translatedFilePath: translatedInvoice.translatedFilePath,
-            translatedFileName: translatedInvoice?.originalFileName || null,
-            status: "completed",
-          },
-          {
-            where: { id: invoice.id },
-          }
-        );
+        // const translatedInvoice = await translateDocument({
+        //   taskId: "Invoice",
+        //   filePath: invoice.originalFilePath,
+        //   fileName: invoice.originalFileName,
+        //   language: language,
+        // });
+        // await invoice.update(
+        //   {
+        //     translatedFilePath: translatedInvoice.translatedFilePath,
+        //     translatedFileName: translatedInvoice?.originalFileName || null,
+        //     status: "completed",
+        //   },
+        //   {
+        //     where: { id: invoice.id },
+        //   }
+        // );
       }
       return sendResponseWithData(
         res,
@@ -454,6 +454,7 @@ const controller = {
         null
       );
     } catch (err) {
+        console.log("sdfsdfsdf",err);
       return sendResponseWithData(
         res,
         ErrorCode.REQUEST_FAILED,
