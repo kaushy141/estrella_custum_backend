@@ -20,4 +20,7 @@ router.delete("/:id", customAgentController.delete);
 // Get custom agents by group
 router.get("/group/:groupId", customAgentController.getByGroup);
 
+//send to custom agent
+router.post("/send-to-custom-agent", customAgentController.sendToCustomAgent);
+
 module.exports = router;

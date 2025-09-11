@@ -30,11 +30,15 @@ const CustomDeclaration = sequelize.define(
     },
     fileContent: {
       type: DataTypes.TEXT,
-      allowNull: false,
+      allowNull: true,
+    },
+    fileName: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
     },
     insights: {
       type: DataTypes.TEXT,
-      allowNull: false,
+      allowNull: true,
     },
   },
   {
@@ -64,7 +68,7 @@ CustomDeclaration.belongsTo(Project, { foreignKey: 'projectId', targetKey: 'id' 
 CustomDeclaration.belongsTo(Group, { foreignKey: 'groupId', targetKey: 'id' });
 
 sequelize.query("SET FOREIGN_KEY_CHECKS = 0").then(function () {
-  CustomDeclaration.sync()
+  CustomDeclaration.sync({ alter: true })
     .then(() => {
       sequelize.query("SET FOREIGN_KEY_CHECKS = 1").then(function () {
         console.log("CustomDeclaration table created successfully!");

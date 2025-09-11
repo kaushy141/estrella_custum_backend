@@ -8,7 +8,7 @@ const controller = {
   create: async function (req, res) {
     try {
       const data = req.body;
-      
+
       // Verify group exists
       const group = await Group.findByPk(data.groupId);
       if (!group) {
@@ -19,22 +19,25 @@ const controller = {
           null
         );
       }
-      
-             const customAgent = await CustomAgent.create(data);
-       
-       // Log activity
-       try {
-         await activityHelper.logCustomAgentCreation(customAgent, req.userId || data.createdBy || 1);
-       } catch (activityError) {
-         console.error("Activity logging failed:", activityError);
-         // Don't fail the main operation if activity logging fails
-       }
-       
-       let responseData = {
-         status: "success",
-         data: customAgent,
-       };
-      
+
+      const customAgent = await CustomAgent.create(data);
+
+      // Log activity
+      try {
+        await activityHelper.logCustomAgentCreation(
+          customAgent,
+          req.userId || data.createdBy || 1
+        );
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
+
+      let responseData = {
+        status: "success",
+        data: customAgent,
+      };
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -56,35 +59,35 @@ const controller = {
     try {
       const { page = 1, limit = 10, groupId, isActive } = req.query;
       const offset = (page - 1) * limit;
-      
+
       let whereClause = {};
       if (groupId) whereClause.groupId = groupId;
       if (isActive !== undefined) {
-        whereClause.isActive = isActive === 'true';
+        whereClause.isActive = isActive === "true";
       }
-      
+
       const customAgents = await CustomAgent.findAndCountAll({
         where: whereClause,
         include: [
           {
             model: Group,
-            as: 'group',
-            attributes: ['id', 'name', 'logo']
-          }
+            as: "group",
+            attributes: ["id", "name", "logo"],
+          },
         ],
         limit: parseInt(limit),
         offset: parseInt(offset),
-        order: [['createdAt', 'DESC']]
+        order: [["createdAt", "DESC"]],
       });
-      
+
       let responseData = {
         status: "success",
         data: customAgents.rows,
         count: customAgents.count,
         currentPage: parseInt(page),
-        totalPages: Math.ceil(customAgents.count / limit)
+        totalPages: Math.ceil(customAgents.count / limit),
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -105,23 +108,20 @@ const controller = {
   getById: async function (req, res) {
     try {
       const { id } = req.params;
-      
+
       const customAgent = await CustomAgent.findOne({
         where: {
-          $or: [
-            { id: id },
-            { guid: id }
-          ]
+          $or: [{ id: id }, { guid: id }],
         },
         include: [
           {
             model: Group,
-            as: 'group',
-            attributes: ['id', 'name', 'logo', 'description']
-          }
-        ]
+            as: "group",
+            attributes: ["id", "name", "logo", "description"],
+          },
+        ],
       });
-      
+
       if (!customAgent) {
         return sendResponseWithData(
           res,
@@ -130,12 +130,12 @@ const controller = {
           null
         );
       }
-      
+
       let responseData = {
         status: "success",
         data: customAgent,
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -157,16 +157,13 @@ const controller = {
     try {
       const { id } = req.params;
       const data = req.body;
-      
+
       const customAgent = await CustomAgent.findOne({
         where: {
-          $or: [
-            { id: id },
-            { guid: id }
-          ]
-        }
+          $or: [{ id: id }, { guid: id }],
+        },
       });
-      
+
       if (!customAgent) {
         return sendResponseWithData(
           res,
@@ -175,7 +172,7 @@ const controller = {
           null
         );
       }
-      
+
       // Verify group exists if groupId is being updated
       if (data.groupId) {
         const group = await Group.findByPk(data.groupId);
@@ -188,15 +185,15 @@ const controller = {
           );
         }
       }
-      
+
       await customAgent.update(data);
       const updatedCustomAgent = await customAgent.save();
-      
+
       let responseData = {
         status: "success",
         data: updatedCustomAgent,
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -217,16 +214,13 @@ const controller = {
   delete: async function (req, res) {
     try {
       const { id } = req.params;
-      
+
       const customAgent = await CustomAgent.findOne({
         where: {
-          $or: [
-            { id: id },
-            { guid: id }
-          ]
-        }
+          $or: [{ id: id }, { guid: id }],
+        },
       });
-      
+
       if (!customAgent) {
         return sendResponseWithData(
           res,
@@ -235,14 +229,14 @@ const controller = {
           null
         );
       }
-      
+
       await customAgent.destroy();
-      
+
       let responseData = {
         status: "success",
-        message: "Custom agent deleted successfully"
+        message: "Custom agent deleted successfully",
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -265,27 +259,27 @@ const controller = {
       const { groupId } = req.params;
       const { page = 1, limit = 10, isActive } = req.query;
       const offset = (page - 1) * limit;
-      
+
       let whereClause = { groupId };
       if (isActive !== undefined) {
-        whereClause.isActive = isActive === 'true';
+        whereClause.isActive = isActive === "true";
       }
-      
+
       const customAgents = await CustomAgent.findAndCountAll({
         where: whereClause,
         limit: parseInt(limit),
         offset: parseInt(offset),
-        order: [['createdAt', 'DESC']]
+        order: [["createdAt", "DESC"]],
       });
-      
+
       let responseData = {
         status: "success",
         data: customAgents.rows,
         count: customAgents.count,
         currentPage: parseInt(page),
-        totalPages: Math.ceil(customAgents.count / limit)
+        totalPages: Math.ceil(customAgents.count / limit),
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -300,7 +294,31 @@ const controller = {
         err
       );
     }
-  }
+  },
+
+  //send to custom agent
+  sendToCustomAgent: async function (req, res) {
+    try {
+      const { data } = req.body;
+      let responseData = {
+        status: "success",
+        message: "Custom agent sent successfully",
+      };
+      return sendResponseWithData(
+        res,
+        SuccessCode.SUCCESS,
+        "Custom agent sent successfully",
+        responseData
+      );
+    } catch (err) {
+      return sendResponseWithData(
+        res,
+        ErrorCode.REQUEST_FAILED,
+        "Unable to send to custom agent",
+        err
+      );
+    }
+  },
 };
 
 module.exports = controller;

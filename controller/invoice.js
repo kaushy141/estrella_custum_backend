@@ -11,10 +11,8 @@ const controller = {
   create: async function (req, res) {
     try {
       const data = req.body;
-
-      await commonHelper.awaitFunction(5000);
       // Verify project exists
-      const project = await Project.findByPk(data.projectId);
+      const project = await Project.findOne({ where: { guid: data.projectId } });
       if (!project) {
         return sendResponseWithData(
           res,
@@ -24,7 +22,7 @@ const controller = {
         );
       }
       // Verify group exists
-      const group = await Group.findByPk(data.groupId);
+      const group = await Group.findOne({ where: { guid: data.groupId } });
       if (!group) {
         return sendResponseWithData(
           res,
@@ -42,6 +40,10 @@ const controller = {
         originalFilePath = req?.files["files[]"][0]?.path;
       }
       data.originalFilePath = originalFilePath;
+      
+      // Convert GUIDs to actual IDs for foreign key constraints
+      data.projectId = project.id;
+      data.groupId = group.id;
 
       const invoice = await Invoice.create(data);
       // Log activity
