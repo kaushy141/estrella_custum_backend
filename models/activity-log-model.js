@@ -62,18 +62,6 @@ const { Group } = require("./group-model");
 ActivityLog.belongsTo(Project, { foreignKey: 'projectId', targetKey: 'id' });
 ActivityLog.belongsTo(Group, { foreignKey: 'groupId', targetKey: 'id' });
 
-sequelize.query("SET FOREIGN_KEY_CHECKS = 0").then(function () {
-  ActivityLog.sync()
-    .then(() => {
-      sequelize.query("SET FOREIGN_KEY_CHECKS = 1").then(function () {
-        console.log("ActivityLog table created successfully!");
-      });
-    })
-    .catch((error) => {
-      sequelize.query("SET FOREIGN_KEY_CHECKS = 1").then(function () {
-        console.error("Unable to create table ActivityLog: ", error);
-      });
-    });
-});
+// Database sync is now handled centrally in config/database-init.js
 
 module.exports = { ActivityLog };

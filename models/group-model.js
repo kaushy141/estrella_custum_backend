@@ -43,18 +43,6 @@ const Group = sequelize.define(
   }
 );
 
-sequelize.query("SET FOREIGN_KEY_CHECKS = 0").then(function () {
-  Group.sync()
-    .then(() => {
-      sequelize.query("SET FOREIGN_KEY_CHECKS = 1").then(function () {
-        console.log("Group table created successfully!");
-      });
-    })
-    .catch((error) => {
-      sequelize.query("SET FOREIGN_KEY_CHECKS = 1").then(function () {
-        console.error("Unable to create table Group: ", error);
-      });
-    });
-});
+// Database sync is now handled centrally in config/database-init.js
 
 module.exports = { Group };

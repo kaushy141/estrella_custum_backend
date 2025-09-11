@@ -85,18 +85,6 @@ const { Group } = require("./group-model");
 // Define associations
 GroupAddress.belongsTo(Group, { foreignKey: 'groupId', targetKey: 'id' });
 
-sequelize.query("SET FOREIGN_KEY_CHECKS = 0").then(function () {
-  GroupAddress.sync()
-    .then(() => {
-      sequelize.query("SET FOREIGN_KEY_CHECKS = 1").then(function () {
-        console.log("GroupAddress table created successfully!");
-      });
-    })
-    .catch((error) => {
-      sequelize.query("SET FOREIGN_KEY_CHECKS = 1").then(function () {
-        console.error("Unable to create table GroupAddress: ", error);
-      });
-    });
-});
+// Database sync is now handled centrally in config/database-init.js
 
 module.exports = { GroupAddress };

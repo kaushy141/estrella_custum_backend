@@ -63,18 +63,6 @@ const { Group } = require("./group-model");
 CustomClearance.belongsTo(Project, { foreignKey: 'projectId', targetKey: 'id' });
 CustomClearance.belongsTo(Group, { foreignKey: 'groupId', targetKey: 'id' });
 
-sequelize.query("SET FOREIGN_KEY_CHECKS = 0").then(function () {
-  CustomClearance.sync()
-    .then(() => {
-      sequelize.query("SET FOREIGN_KEY_CHECKS = 1").then(function () {
-        console.log("CustomClearance table created successfully!");
-      });
-    })
-    .catch((error) => {
-      sequelize.query("SET FOREIGN_KEY_CHECKS = 1").then(function () {
-        console.error("Unable to create table CustomClearance: ", error);
-      });
-    });
-});
+// Database sync is now handled centrally in config/database-init.js
 
 module.exports = { CustomClearance };
