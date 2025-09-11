@@ -12,7 +12,9 @@ const controller = {
     try {
       const data = req.body;
       // Verify project exists
-      const project = await Project.findOne({ where: { guid: data.projectId } });
+      const project = await Project.findOne({
+        where: { guid: data.projectId },
+      });
       if (!project) {
         return sendResponseWithData(
           res,
@@ -40,7 +42,7 @@ const controller = {
         originalFilePath = req?.files["files[]"][0]?.path;
       }
       data.originalFilePath = originalFilePath;
-      
+
       // Convert GUIDs to actual IDs for foreign key constraints
       data.projectId = project.id;
       data.groupId = group.id;
@@ -85,10 +87,27 @@ const controller = {
     try {
       const { page = 1, limit = 10, projectId, groupId } = req.query;
       const offset = (page - 1) * limit;
-
+      const project = await Project.findOne({ where: { guid: projectId } });
+      const group = await Group.findOne({ where: { guid: groupId } });
+      if (!project) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Project not found",
+          null
+        );
+      }
+      if (!group) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Group not found",
+          null
+        );
+      }
       let whereClause = {};
-      if (projectId) whereClause.projectId = projectId;
-      if (groupId) whereClause.groupId = groupId;
+      whereClause.projectId = project.id;
+      whereClause.groupId = group.id;
 
       const invoices = await Invoice.findAndCountAll({
         where: whereClause,
@@ -124,6 +143,7 @@ const controller = {
         responseData
       );
     } catch (err) {
+      console.log("sdfsdfsdf",err);
       return sendResponseWithData(
         res,
         ErrorCode.REQUEST_FAILED,
@@ -454,7 +474,7 @@ const controller = {
         null
       );
     } catch (err) {
-        console.log("sdfsdfsdf",err);
+      console.log("sdfsdfsdf", err);
       return sendResponseWithData(
         res,
         ErrorCode.REQUEST_FAILED,
