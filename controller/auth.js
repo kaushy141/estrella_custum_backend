@@ -29,7 +29,7 @@ const controller = {
           {
             model: Group,
             as: 'group',
-            attributes: ['id', 'name', 'logo', 'description']
+            attributes: ['id', 'name', 'logo', 'description','guid']
           }
         ],
         attributes: { exclude: ['password'] }
