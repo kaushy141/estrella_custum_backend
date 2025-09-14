@@ -41,6 +41,9 @@ const controller = {
       if (req?.files && req?.files["files[]"]) {
         originalFilePath = req?.files["files[]"][0]?.path;
       }
+      if (req?.files && req?.files["files[]"]) {
+        data.originalFileName = req?.files["files[]"][0]?.filename;
+      }
       data.originalFilePath = originalFilePath;
 
       // Convert GUIDs to actual IDs for foreign key constraints
@@ -292,7 +295,7 @@ const controller = {
 
       const invoice = await Invoice.findOne({
         where: {
-          $or: [{ id: id }, { guid: id }],
+          $or: [ { guid: id }],
         },
       });
 

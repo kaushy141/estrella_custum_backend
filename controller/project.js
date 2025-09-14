@@ -10,7 +10,7 @@ const controller = {
     try {
       const data = req.body;
       // Verify group exists
-      const group = await Group.findByPk(data.groupId);
+      const group = await Group.findOne({ where: { guid: data.groupId } });
       if (!group) {
         return sendResponseWithData(
           res,
@@ -19,6 +19,7 @@ const controller = {
           null
         );
       }
+      data.groupId = group.id;
       const project = await Project.create(data);
       // Log activity
       try {
@@ -55,6 +56,7 @@ const controller = {
       const { page = 1, limit = 10, groupId, status, isActive } = req.query;
       const offset = (page - 1) * limit;
 
+      
       let whereClause = {};
       if (groupId) whereClause.groupId = groupId;
       if (status) whereClause.status = status;
@@ -264,13 +266,21 @@ const controller = {
       const { groupId } = req.params;
       const { page = 1, limit = 10, status, isActive } = req.query;
       const offset = (page - 1) * limit;
+      const group = await Group.findOne({ where: { guid: groupId } });
+      if (!group) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Group not found",
+          null
+        );
+      }
 
-      let whereClause = { groupId };
+      let whereClause = { groupId: group.id };
       if (status) whereClause.status = status;
       if (isActive !== undefined) {
         whereClause.isActive = isActive === 'true';
       }
-
       const projects = await Project.findAndCountAll({
         where: whereClause,
         limit: parseInt(limit),
