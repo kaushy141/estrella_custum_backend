@@ -11,7 +11,10 @@ const PORT = process.env.PORT || 3002;
 
 // Security middleware
 app.use(helmet());
-app.use(cors({ origin: '*' }));
+app.use(cors({ 
+  origin: true,  // Allows all origins and supports credentials
+  credentials: true 
+}));
 
 // Body parsing middleware
 app.use(express.json());
