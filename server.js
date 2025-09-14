@@ -11,20 +11,7 @@ const PORT = process.env.PORT || 3002;
 
 // Security middleware
 app.use(helmet());
-app.use(
-  cors({
-    origin: [
-      "http://localhost:3000",
-      "http://localhost:8081",
-      "http://192.168.31.41:8081/",
-      "https://customapi.estrellajewels.com/",
-      "https://customapp.estrellajewels.com/",
-      "https://customapp.estrellajewels.com/",
-      "*",
-    ],
-    credentials: true,
-  })
-);
+app.use(cors("*"));
 
 // Body parsing middleware
 app.use(express.json());
