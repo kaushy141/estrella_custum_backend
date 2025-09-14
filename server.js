@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 3002;
 
 // Security middleware
 app.use(helmet());
-app.use(cors("*"));
+app.use(cors());
 
 // Body parsing middleware
 app.use(express.json());
