@@ -13,13 +13,7 @@ const PORT = process.env.PORT || 3002;
 app.use(helmet());
 app.use(
   cors({
-    origin: [
-      "http://localhost:3000",
-      "http://localhost:8081",
-      "http://192.168.31.41:8081/",
-      "https://customapp.estrellajewels.com/",
-      "*",
-    ],
+    origin: true,
     credentials: true,
   })
 );
