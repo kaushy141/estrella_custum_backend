@@ -22,9 +22,9 @@ app.use(cors({
     return callback(null, true);
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  methods: "*",
+  allowedHeaders: "*",
+  exposedHeaders: "*",  
   optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 }));
 
