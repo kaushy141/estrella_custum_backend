@@ -13,23 +13,29 @@ const PORT = process.env.PORT || 3002;
 app.use(helmet());
 
 // CORS configuration
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // Allow all origins for now - you can restrict this in production
-    return callback(null, true);
-  },
-  credentials: true,
-  methods: "*",
-  allowedHeaders: "*",
-  exposedHeaders: "*",  
-  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
-}));
-
-// Handle preflight requests
-app.options('*', cors());
+app.use(
+  cors({
+    allowedHeaders: ["Content-Type", "token", "authorization", "Baggage", "sentry-trace"],
+    exposedHeaders: ["token", "authorization"],
+    origin: [
+      "http://localhost:3000",
+      "http://127.0.0.1:3000",
+      "http://localhost:3001",
+      "http://localhost:3002",
+      "http://localhost:3003",
+      "http://dashboard.estrellajewels.com",
+      "https://dashboard.estrellajewels.com",
+      "http://estrellaestrellajewels.com",
+      "https://estrellajewels.com",
+      "http://www.estrellajewels.com",
+      "https://www.estrellajewels.com",
+      "https://customapp.estrellajewels.com",
+    ],
+    credentials: true,
+    methods: "GET, HEAD, PUT, PATCH, POST, DELETE",
+    preflightContinue: false,
+  })
+);
 
 // Body parsing middleware
 app.use(express.json());
