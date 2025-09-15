@@ -20,22 +20,22 @@ const operatorsAliases = {
   $in: Op.in,
 };
 
-const dbConfig = {
-  database: process.env.DB_NAME || "customs",
-  username: process.env.DB_USER || "root",
-  password: process.env.DB_PASSWORD || "",
-  hostname: process.env.DB_HOST || "localhost",
-  port: process.env.DB_PORT || 3306,
-  dialect: process.env.DB_DIALECT || "mysql"
-};
 // const dbConfig = {
 //   database: process.env.DB_NAME || "customs",
 //   username: process.env.DB_USER || "root",
-//   password: process.env.DB_PASSWORD || "Kaushal@123",
+//   password: process.env.DB_PASSWORD || "",
 //   hostname: process.env.DB_HOST || "localhost",
 //   port: process.env.DB_PORT || 3306,
 //   dialect: process.env.DB_DIALECT || "mysql"
 // };
+const dbConfig = {
+  database: process.env.DB_NAME || "customs",
+  username: process.env.DB_USER || "root",
+  password: process.env.DB_PASSWORD || "Kaushal@123",
+  hostname: process.env.DB_HOST || "localhost",
+  port: process.env.DB_PORT || 3306,
+  dialect: process.env.DB_DIALECT || "mysql"
+};
 
 const sequelize = new Sequelize(
   dbConfig.database,
