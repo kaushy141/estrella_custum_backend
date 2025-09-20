@@ -22,7 +22,7 @@ const controller = {
       const shippingService = await ShippingService.create(data);
       // Log activity
       try {
-        await activityHelper.logShippingServiceCreation(shippingService, req.userId || data.createdBy || 1);
+        // await activityHelper.logShippingServiceCreation(shippingService, req.userId || data.createdBy || 1);
       } catch (activityError) {
         console.error("Activity logging failed:", activityError);
         // Don't fail the main operation if activity logging fails
@@ -51,6 +51,56 @@ const controller = {
 
   // Get all shipping services
   getAll: async function (req, res) {
+    try {
+      const { page = 1, limit = 10,  isActive } = req.query;
+      const offset = (page - 1) * limit;
+
+      let whereClause = {};
+      if (isActive !== undefined) {
+        whereClause.isActive = isActive === 'true';
+      }
+
+      const shippingServices = await ShippingService.findAndCountAll({
+        where: whereClause,
+        include: [
+          {
+            model: Group,
+            as: 'group',
+            attributes: ['id', 'name', 'logo']
+          }
+        ],
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        order: [['createdAt', 'DESC']]
+      });
+
+      let responseData = {
+        status: "success",
+        data: shippingServices.rows,
+        count: shippingServices.count,
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(shippingServices.count / limit)
+      };
+
+      return sendResponseWithData(
+        res,
+        SuccessCode.SUCCESS,
+        "Shipping services loaded successfully",
+        responseData
+      );
+    } catch (err) {
+      console.error("Shipping service load failed:", err);
+
+      return sendResponseWithData(
+        res,
+        ErrorCode.REQUEST_FAILED,
+        "Unable to load shipping services",
+        err
+      );
+    }
+  },
+  // Get all shipping services
+  getAllForGroup: async function (req, res) {
     try {
       const { page = 1, limit = 10, groupId, isActive } = req.query;
       const offset = (page - 1) * limit;
@@ -99,6 +149,8 @@ const controller = {
         responseData
       );
     } catch (err) {
+      console.error("Shipping service load failed:", err);
+
       return sendResponseWithData(
         res,
         ErrorCode.REQUEST_FAILED,
