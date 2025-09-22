@@ -82,6 +82,7 @@ const controller = {
           email: user.email, 
           groupId: user.groupId,
           isAdmin: user.isAdmin,
+          isSuperAdmin: user.isSuperAdmin,
           firstName: user.firstName,
           lastName: user.lastName,
           fullName: user.firstName + " " + user.lastName,

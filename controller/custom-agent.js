@@ -8,7 +8,6 @@ const controller = {
   create: async function (req, res) {
     try {
       const data = req.body;
-
       // Verify group exists
       const group = await Group.findByPk(data.groupId);
       if (!group) {
@@ -57,20 +56,15 @@ const controller = {
   // Get all custom agents
   getAll: async function (req, res) {
     try {
-      const { page = 1, limit = 10, groupId, isActive } = req.query;
-      const offset = (page - 1) * limit;
-
-      const group = await Group.findOne({ where: { guid: groupId } });
-      if (!group) {
-        return sendResponseWithData(
-          res,
-          ErrorCode.NOT_FOUND,
-          "Group not found",
-          null
-        );
-      }
+      const { page = 1, limit = 10, isActive } = req.query;
       let whereClause = {};
-      whereClause.groupId = group.id;
+      const offset = (page - 1) * limit;
+      const groupId = req.groupId;
+      const isSuperAdmin = req.isSuperAdmin;
+      whereClause.groupId = groupId;
+      if (isSuperAdmin) {
+        _.omit(whereClause, "groupId");
+      }
       if (isActive !== undefined) {
         whereClause.isActive = isActive === "true";
       }

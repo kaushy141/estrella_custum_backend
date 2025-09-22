@@ -54,8 +54,13 @@ const controller = {
     try {
       const { page = 1, limit = 10,  isActive } = req.query;
       const offset = (page - 1) * limit;
-
       let whereClause = {};
+      const groupId = req.groupId;
+      const isSuperAdmin = req.isSuperAdmin;
+      whereClause.groupId = groupId;
+      if (isSuperAdmin) {
+        _.omit(whereClause, "groupId");
+      }
       if (isActive !== undefined) {
         whereClause.isActive = isActive === 'true';
       }

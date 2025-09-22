@@ -53,12 +53,17 @@ const controller = {
   // Get all projects
   getAll: async function (req, res) {
     try {
-      const { page = 1, limit = 10, groupId, status, isActive } = req.query;
+      const { page = 1, limit = 10, status, isActive } = req.query;
       const offset = (page - 1) * limit;
 
       
       let whereClause = {};
-      if (groupId) whereClause.groupId = groupId;
+      const groupId = req.groupId;
+      const isSuperAdmin = req.isSuperAdmin;
+      whereClause.groupId = groupId;
+      if (isSuperAdmin) {
+        _.omit(whereClause, "groupId");
+      }
       if (status) whereClause.status = status;
       if (isActive !== undefined) {
         whereClause.isActive = isActive === 'true';

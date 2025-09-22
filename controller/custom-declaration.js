@@ -81,12 +81,16 @@ const controller = {
   // Get all custom declarations
   getAll: async function (req, res) {
     try {
-      const { page = 1, limit = 10, projectId, groupId } = req.query;
+      const { page = 1, limit = 10, projectId } = req.query;
       const offset = (page - 1) * limit;
-
+      const groupId = req.groupId;
+      const isSuperAdmin = req.isSuperAdmin;
       let whereClause = {};
       if (projectId) whereClause.projectId = projectId;
-      if (groupId) whereClause.groupId = groupId;
+      whereClause.groupId = groupId;
+      if (isSuperAdmin) {
+        _.omit(whereClause, "groupId");
+      }
 
       const customDeclarations = await CustomDeclaration.findAndCountAll({
         where: whereClause,

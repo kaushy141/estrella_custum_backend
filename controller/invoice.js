@@ -88,8 +88,10 @@ const controller = {
   // Get all invoices
   getAll: async function (req, res) {
     try {
-      const { page = 1, limit = 10, projectId, groupId } = req.query;
+      const { page = 1, limit = 10, projectId } = req.query;
       const offset = (page - 1) * limit;
+      const groupId = req.groupId;
+      const isSuperAdmin = req.isSuperAdmin;
       const project = await Project.findOne({ where: { guid: projectId } });
       const group = await Group.findOne({ where: { guid: groupId } });
       if (!project) {
@@ -100,18 +102,13 @@ const controller = {
           null
         );
       }
-      if (!group) {
-        return sendResponseWithData(
-          res,
-          ErrorCode.NOT_FOUND,
-          "Group not found",
-          null
-        );
-      }
+     
       let whereClause = {};
       whereClause.projectId = project.id;
-      whereClause.groupId = group.id;
-
+      whereClause.groupId = groupId;
+      if (isSuperAdmin) {
+        _.omit(whereClause, "groupId");
+      }
       const invoices = await Invoice.findAndCountAll({
         where: whereClause,
         include: [

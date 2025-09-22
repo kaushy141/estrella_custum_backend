@@ -55,11 +55,16 @@ const controller = {
   // Get all group addresses
   getAll: async function (req, res) {
     try {
-      const { page = 1, limit = 10, groupId, isActive } = req.query;
+      const { page = 1, limit = 10, isActive } = req.query;
       const offset = (page - 1) * limit;
       
       let whereClause = {};
-      if (groupId) whereClause.groupId = groupId;
+      const groupId = req.groupId;
+      const isSuperAdmin = req.isSuperAdmin;
+      whereClause.groupId = groupId;
+      if (isSuperAdmin) {
+        _.omit(whereClause, "groupId");
+      }
       if (isActive !== undefined) {
         whereClause.isActive = isActive === 'true';
       }
