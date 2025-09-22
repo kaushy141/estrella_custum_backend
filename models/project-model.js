@@ -34,6 +34,7 @@ const Project = sequelize.define(
     status: {
       type: DataTypes.STRING(255),
       allowNull: false,
+      defaultValue: c.projectStatus.uploadInvoice,
     },
     isActive: {
       type: DataTypes.BOOLEAN,
@@ -57,6 +58,7 @@ const Project = sequelize.define(
 
 // Import Group model for association
 const { Group } = require("./group-model");
+const c = require("../config/constants");
 
 // Define associations
 Project.belongsTo(Group, { foreignKey: 'groupId', targetKey: 'id' });

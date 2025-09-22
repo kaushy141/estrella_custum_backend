@@ -20,18 +20,6 @@ const controller = {
       }
 
       const customAgent = await CustomAgent.create(data);
-
-      // Log activity
-      try {
-        await activityHelper.logCustomAgentCreation(
-          customAgent,
-          req.userId || data.createdBy || 1
-        );
-      } catch (activityError) {
-        console.error("Activity logging failed:", activityError);
-        // Don't fail the main operation if activity logging fails
-      }
-
       let responseData = {
         status: "success",
         data: customAgent,

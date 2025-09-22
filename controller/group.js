@@ -10,6 +10,7 @@ const controller = {
       const data = req.body;
              const group = await Group.create(data);
        
+             
                // Log activity
         try {
           await activityHelper.logGroupCreation(group, req.userId || data.createdBy || 1);
