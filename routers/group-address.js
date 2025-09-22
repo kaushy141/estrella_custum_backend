@@ -1,26 +1,27 @@
 const express = require("express");
 const router = express.Router();
 const groupAddressController = require("../controller/group-address");
+const { authenticateToken } = require("../middleware/auth");
 
 // Create new group address
-router.post("/", groupAddressController.create);
+router.post("/", authenticateToken, groupAddressController.create);
 
 // Get all group addresses with pagination and filters
-router.get("/", groupAddressController.getAll);
+router.get("/", authenticateToken, groupAddressController.getAll);
 
 // Get group address by ID or GUID
-router.get("/:id", groupAddressController.getById);
+router.get("/:id", authenticateToken, groupAddressController.getById);
 
 // Update group address
-router.put("/:id", groupAddressController.update);
+router.put("/:id", authenticateToken, groupAddressController.update);
 
 // Delete group address
-router.delete("/:id", groupAddressController.delete);
+router.delete("/:id", authenticateToken, groupAddressController.delete);
 
 // Get group addresses by group
-router.get("/group/:groupId", groupAddressController.getByGroup);
+router.get("/group/:groupId", authenticateToken, groupAddressController.getByGroup);
 
 // Search group addresses by location
-router.get("/search/location", groupAddressController.searchByLocation);
+router.get("/search/location", authenticateToken, groupAddressController.searchByLocation);
 
 module.exports = router;

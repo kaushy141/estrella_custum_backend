@@ -1,26 +1,27 @@
 const express = require("express");
 const router = express.Router();
 const customDeclarationController = require("../controller/custom-declaration");
+const { authenticateToken } = require("../middleware/auth");
 
 // Create new custom declaration
-router.post("/", customDeclarationController.create);
+router.post("/", authenticateToken, customDeclarationController.create);
 
 // Get all custom declarations with pagination and filters
-router.get("/", customDeclarationController.getAll);
+router.get("/", authenticateToken, customDeclarationController.getAll);
 
 // Get custom declaration by ID or GUID
-router.get("/:id", customDeclarationController.getById);
+router.get("/:id", authenticateToken, customDeclarationController.getById);
 
 // Update custom declaration
-router.put("/:id", customDeclarationController.update);
+router.put("/:id", authenticateToken, customDeclarationController.update);
 
 // Delete custom declaration
-router.delete("/:id", customDeclarationController.delete);
+router.delete("/:id", authenticateToken, customDeclarationController.delete);
 
 // Get custom declarations by project
-router.get("/project/:projectId", customDeclarationController.getByProject);
+router.get("/project/:projectId", authenticateToken, customDeclarationController.getByProject);
 
 // Get custom declarations by group
-router.get("/group/:groupId", customDeclarationController.getByGroup);
+router.get("/group/:groupId", authenticateToken, customDeclarationController.getByGroup);
 
 module.exports = router;

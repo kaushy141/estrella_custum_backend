@@ -1,29 +1,30 @@
 const express = require("express");
 const router = express.Router();
 const activityLogController = require("../controller/activity-log");
+const { authenticateToken } = require("../middleware/auth");
 
 // Create new activity log
-router.post("/", activityLogController.create);
+router.post("/",authenticateToken, activityLogController.create);
 
 // Get all activity logs with pagination and filters
-router.get("/", activityLogController.getAll);
+router.get("/", authenticateToken, activityLogController.getAll);
 
 // Get activity log by ID or GUID
-router.get("/:id", activityLogController.getById);
+router.get("/:id", authenticateToken, activityLogController.getById);
 
 // Update activity log
-router.put("/:id", activityLogController.update);
+router.put("/:id", authenticateToken, activityLogController.update);
 
 // Delete activity log
-router.delete("/:id", activityLogController.delete);
+router.delete("/:id", authenticateToken, activityLogController.delete);
 
 // Get activity logs by project
-router.get("/project/:projectId", activityLogController.getByProject);
+router.get("/project/:projectId", authenticateToken, activityLogController.getByProject);
 
 // Get activity logs by group
-router.get("/group/:groupId", activityLogController.getByGroup);
+router.get("/group/:groupId", authenticateToken, activityLogController.getByGroup);
 
 // Search activity logs
-router.get("/search", activityLogController.search);
+router.get("/search", authenticateToken, activityLogController.search);
 
 module.exports = router;

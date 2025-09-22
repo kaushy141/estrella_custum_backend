@@ -111,6 +111,7 @@ const authenticateToken = async (req, res, next) => {
     req.user = user;
     req.token = token;
     req.userId = user.id;
+    req.groupId = user.groupId;
     
     next();
   } catch (err) {

@@ -1,23 +1,24 @@
 const express = require("express");
 const router = express.Router();
 const customAgentController = require("../controller/custom-agent");
+const { authenticateToken } = require("../middleware/auth");
 
 // Create new custom agent
-router.post("/", customAgentController.create);
+router.post("/", authenticateToken, customAgentController.create);
 
 // Get all custom agents with pagination and filters
-router.get("/", customAgentController.getAll);
+router.get("/", authenticateToken, customAgentController.getAll);
 
 // Get custom agent by ID or GUID
-router.get("/:id", customAgentController.getById);
+router.get("/:id", authenticateToken, customAgentController.getById);
 
 // Update custom agent
-router.put("/:id", customAgentController.update);
+router.put("/:id", authenticateToken, customAgentController.update);
 
 // Delete custom agent
-router.delete("/:id", customAgentController.delete);
+router.delete("/:id", authenticateToken, customAgentController.delete);
 
 // Get custom agents by group
-router.get("/group/:groupId", customAgentController.getByGroup);
+router.get("/group/:groupId", authenticateToken, customAgentController.getByGroup);
 
 module.exports = router;

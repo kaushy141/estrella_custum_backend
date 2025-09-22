@@ -2,28 +2,30 @@ const express = require("express");
 const router = express.Router();
 const invoiceController = require("../controller/invoice");
 const { uploadMiddleware } = require("../middleware/media");
+const { authenticateToken } = require("../middleware/auth");
+
 // Create new invoice
-router.post("/", uploadMiddleware("invoices").fields([{ name: "files[]", maxCount: 10 }]), invoiceController.create);
+router.post("/", authenticateToken, uploadMiddleware("invoices").fields([{ name: "files[]", maxCount: 10 }]), invoiceController.create);
 
 // Get all invoices with pagination and filters
-router.get("/", invoiceController.getAll);
+router.get("/", authenticateToken, invoiceController.getAll);
 
 // Get invoice by ID or GUID
-router.get("/:id", invoiceController.getById);
+router.get("/:id", authenticateToken, invoiceController.getById);
 
 // Update invoice
-router.put("/:id", uploadMiddleware("invoices").fields([{ name: "originalFiles[]", maxCount: 10 }, { name: "translatedFiles[]", maxCount: 10 }]), invoiceController.update);
+router.put("/:id", authenticateToken, uploadMiddleware("invoices").fields([{ name: "originalFiles[]", maxCount: 10 }, { name: "translatedFiles[]", maxCount: 10 }]), invoiceController.update);
 
 // Delete invoice
-router.delete("/:id", invoiceController.delete);
+router.delete("/:id", authenticateToken, invoiceController.delete);
 
 // Get invoices by project
-router.get("/project/:projectId", invoiceController.getByProject);
+router.get("/project/:projectId", authenticateToken, invoiceController.getByProject);
 
 // Get invoices by group
-router.get("/group/:groupId", invoiceController.getByGroup);
+router.get("/group/:groupId", authenticateToken, invoiceController.getByGroup);
 
 // Translate invoice
-router.post("/translate/:id", invoiceController.translate);
+router.post("/translate/:id", authenticateToken, invoiceController.translate);
 
 module.exports = router;
