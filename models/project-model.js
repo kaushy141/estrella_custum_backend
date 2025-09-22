@@ -1,6 +1,6 @@
 const { DataTypes } = require("sequelize");
 const { sequelize } = require("../db");
-
+const c = require("../config/constants");
 const Project = sequelize.define(
   "project",
   {
@@ -58,7 +58,6 @@ const Project = sequelize.define(
 
 // Import Group model for association
 const { Group } = require("./group-model");
-const c = require("../config/constants");
 
 // Define associations
 Project.belongsTo(Group, { foreignKey: 'groupId', targetKey: 'id' });
