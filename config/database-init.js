@@ -50,6 +50,16 @@ async function initializeDatabase() {
     // Disable foreign key checks
     await sequelize.query("SET FOREIGN_KEY_CHECKS = 0");
     
+    // Clean up orphaned records in ActivityLog before syncing
+    // console.log('🧹 Cleaning up orphaned ActivityLog records...');
+    // await sequelize.query(`
+    //   UPDATE activityLogs 
+    //   SET projectId = NULL 
+    //   WHERE projectId IS NOT NULL 
+    //   AND projectId NOT IN (SELECT id FROM projects)
+    // `);
+    // console.log('✅ Orphaned ActivityLog records cleaned up');
+    
     // Sync models in order to avoid foreign key constraint issues
     for (const modelName of syncOrder) {
       const model = models[modelName];
