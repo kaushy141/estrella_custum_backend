@@ -9,8 +9,6 @@ const controller = {
     try {
       const data = req.body;
              const group = await Group.create(data);
-       
-             
                // Log activity
         try {
           await activityHelper.logGroupCreation(group, req.userId || data.createdBy || 1);
@@ -49,7 +47,7 @@ const controller = {
       let whereClause = {};
       const groupId = req.groupId;
       const isSuperAdmin = req.isSuperAdmin;
-      whereClause.groupId = groupId;
+      whereClause.id = groupId;
       if (isSuperAdmin) {
         _.omit(whereClause, "groupId");
       }

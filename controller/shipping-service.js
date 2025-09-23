@@ -8,7 +8,6 @@ const controller = {
   create: async function (req, res) {
     try {
       const data = req.body;
-
       // Verify group exists
       const group = await Group.findByPk(data.groupId);
       if (!group) {
