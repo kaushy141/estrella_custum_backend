@@ -49,7 +49,7 @@ const controller = {
       const isSuperAdmin = req.isSuperAdmin;
       whereClause.id = groupId;
       if (isSuperAdmin) {
-        _.omit(whereClause, "groupId");
+        _.omit(whereClause, "id");
       }
       if (isActive !== undefined) {
         whereClause.isActive = isActive === 'true';
