@@ -8,11 +8,11 @@ const c = {
     AUTH_TOKEN: process.env.AI_AGENT_AUTH_TOKEN || "ai_agent_secure_token_2024",
   },
   projectStatus: {
-    uploadInvoice: "Upload Invoice",
-    docUploaded: "Doc Uploaded",
-    shipmentDocUploaded: "Shipment Doc Uploaded",
-    waitingForZCDoc: "Waiting For ZC Doc",
-    zcDocInsights: "ZC Doc Insights",
+    uploadInvoice: "uploadInvoice",
+    docUploaded: "docUploaded",
+    shipmentDocUploaded: "shipmentDocUploaded",
+    waitingForZCDoc: "waitingForZCDoc",
+    zcDocInsights: "zcDocInsights",
   },
 };
 module.exports = c;

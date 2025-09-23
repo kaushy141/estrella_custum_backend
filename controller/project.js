@@ -167,7 +167,6 @@ const controller = {
       const project = await Project.findOne({
         where: {
           $or: [
-            { id: id },
             { guid: id }
           ]
         }
@@ -181,23 +180,8 @@ const controller = {
           null
         );
       }
-
-      // Verify group exists if groupId is being updated
-      if (data.groupId) {
-        const group = await Group.findByPk(data.groupId);
-        if (!group) {
-          return sendResponseWithData(
-            res,
-            ErrorCode.NOT_FOUND,
-            "Group not found",
-            null
-          );
-        }
-      }
-
       await project.update(data);
       const updatedProject = await project.save();
-
       let responseData = {
         status: "success",
         data: updatedProject,
@@ -218,7 +202,33 @@ const controller = {
       );
     }
   },
-
+  statusUpdate: async function (req, res) {
+    try {
+      const { id, status } = req.params;
+      const project = await Project.findOne({ where: { guid: id } });
+      if (!project) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Project not found",
+          null
+        );
+      }
+      await project.update({ status });
+      const updatedProject = await project.save();
+      let responseData = {
+        status: "success",
+        data: updatedProject,
+      };
+      return sendResponseWithData(
+        res,
+        SuccessCode.SUCCESS,
+        "Project status updated successfully",
+        responseData
+      );
+    } catch (err) {
+    }
+  },
   // Delete project
   delete: async function (req, res) {
     try {
