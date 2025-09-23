@@ -5,7 +5,7 @@ const { sendResponseWithData } = require("../helper/commonResponseHandler");
 const { SuccessCode, ErrorCode } = require("../helper/statusCode");
 const { Op } = require("sequelize");
 const activityHelper = require("../helper/activityHelper");
-
+const _ = require("lodash");
 const controller = {
   // Create new courier receipt
   create: async function (req, res) {

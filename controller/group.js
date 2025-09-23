@@ -2,7 +2,7 @@ const { Group } = require("../models/group-model");
 const { sendResponseWithData } = require("../helper/commonResponseHandler");
 const { SuccessCode, ErrorCode } = require("../helper/statusCode");
 const activityHelper = require("../helper/activityHelper");
-
+const _ = require("lodash");
 const controller = {
   // Create new group
   create: async function (req, res) {

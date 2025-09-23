@@ -3,7 +3,7 @@ const { Group } = require("../models/group-model");
 const { sendResponseWithData } = require("../helper/commonResponseHandler");
 const { SuccessCode, ErrorCode } = require("../helper/statusCode");
 const { Op } = require("sequelize");
-
+const _ = require("lodash");
 const controller = {
   // Create new group address
   create: async function (req, res) {

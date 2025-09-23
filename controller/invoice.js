@@ -6,6 +6,7 @@ const { SuccessCode, ErrorCode } = require("../helper/statusCode");
 const activityHelper = require("../helper/activityHelper");
 const { translateDocument } = require("../services/doc-translation.service");
 const commonHelper = require("../helper/common-helper");
+const _ = require("lodash");
 const controller = {
   // Create new invoice
   create: async function (req, res) {
