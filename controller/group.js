@@ -54,7 +54,7 @@ const controller = {
       if (isActive !== undefined) {
         whereClause.isActive = isActive === 'true';
       }
-      
+      console.log("whereClause",whereClause);
       const groups = await Group.findAndCountAll({
         where: whereClause,
         limit: parseInt(limit),
