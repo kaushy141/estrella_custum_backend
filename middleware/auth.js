@@ -67,6 +67,7 @@ const authenticateSession = async (req, res, next) => {
 const authenticateToken = async (req, res, next) => {
   try {
     // Get token from header
+    console.log("authenticateToken called");
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
     
