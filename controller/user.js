@@ -12,7 +12,7 @@ const controller = {
   create: async function (req, res) {
     try {
       const data = req.body;
-      
+
       // Verify group exists
       const group = await Group.findByPk(data.groupId);
       if (!group) {
@@ -23,31 +23,37 @@ const controller = {
           null
         );
       }
-      
+
       // Hash password if provided
       if (data.password) {
-        data.password = crypto.createHash('sha256').update(data.password).digest('hex');
+        data.password = crypto
+          .createHash("sha256")
+          .update(data.password)
+          .digest("hex");
       }
-      
+
       const user = await User.create(data);
-      
+
       // Remove password from response
       const userResponse = user.toJSON();
       delete userResponse.password;
-      
-             // Log activity
-       try {
-         await activityHelper.logUserCreation(userResponse, req.userId || data.createdBy || 1);
-       } catch (activityError) {
-         console.error("Activity logging failed:", activityError);
-         // Don't fail the main operation if activity logging fails
-       }
-      
+
+      // Log activity
+      try {
+        await activityHelper.logUserCreation(
+          userResponse,
+          req.userId || data.createdBy || 1
+        );
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
+
       let responseData = {
         status: "success",
         data: userResponse,
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -73,37 +79,37 @@ const controller = {
       const groupId = req.groupId;
       const isSuperAdmin = req.isSuperAdmin;
       let whereClause = {};
+      whereClause.groupId = groupId;
       if (isSuperAdmin) {
         _.omit(whereClause, "groupId");
       }
-      if (groupId) whereClause.groupId = groupId;
       if (isActive !== undefined) {
-        whereClause.isActive = isActive === 'true';
+        whereClause.isActive = isActive === "true";
       }
-      
+
       const users = await User.findAndCountAll({
         where: whereClause,
         include: [
           {
             model: Group,
-            as: 'group',
-            attributes: ['id', 'name', 'logo']
-          }
+            as: "group",
+            attributes: ["id", "name", "logo"],
+          },
         ],
-        attributes: { exclude: ['password'] },
+        attributes: { exclude: ["password"] },
         limit: parseInt(limit),
         offset: parseInt(offset),
-        order: [['createdAt', 'DESC']]
+        order: [["createdAt", "DESC"]],
       });
-      
+
       let responseData = {
         status: "success",
         data: users.rows,
         count: users.count,
         currentPage: parseInt(page),
-        totalPages: Math.ceil(users.count / limit)
+        totalPages: Math.ceil(users.count / limit),
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -124,24 +130,21 @@ const controller = {
   getById: async function (req, res) {
     try {
       const { id } = req.params;
-      
+
       const user = await User.findOne({
         where: {
-          $or: [
-            { id: id },
-            { guid: id }
-          ]
+          $or: [{ id: id }, { guid: id }],
         },
         include: [
           {
             model: Group,
-            as: 'group',
-            attributes: ['id', 'name', 'logo', 'description']
-          }
+            as: "group",
+            attributes: ["id", "name", "logo", "description"],
+          },
         ],
-        attributes: { exclude: ['password'] }
+        attributes: { exclude: ["password"] },
       });
-      
+
       if (!user) {
         return sendResponseWithData(
           res,
@@ -150,12 +153,12 @@ const controller = {
           null
         );
       }
-      
+
       let responseData = {
         status: "success",
         data: user,
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -177,16 +180,13 @@ const controller = {
     try {
       const { id } = req.params;
       const data = req.body;
-      
+
       const user = await User.findOne({
         where: {
-          $or: [
-            { id: id },
-            { guid: id }
-          ]
-        }
+          $or: [{ id: id }, { guid: id }],
+        },
       });
-      
+
       if (!user) {
         return sendResponseWithData(
           res,
@@ -195,7 +195,7 @@ const controller = {
           null
         );
       }
-      
+
       // Verify group exists if groupId is being updated
       if (data.groupId) {
         const group = await Group.findByPk(data.groupId);
@@ -208,24 +208,27 @@ const controller = {
           );
         }
       }
-      
+
       // Hash password if provided
       if (data.password) {
-        data.password = crypto.createHash('sha256').update(data.password).digest('hex');
+        data.password = crypto
+          .createHash("sha256")
+          .update(data.password)
+          .digest("hex");
       }
-      
+
       await user.update(data);
       const updatedUser = await user.save();
-      
+
       // Remove password from response
       const userResponse = updatedUser.toJSON();
       delete userResponse.password;
-      
+
       let responseData = {
         status: "success",
         data: userResponse,
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -246,16 +249,13 @@ const controller = {
   delete: async function (req, res) {
     try {
       const { id } = req.params;
-      
+
       const user = await User.findOne({
         where: {
-          $or: [
-            { id: id },
-            { guid: id }
-          ]
-        }
+          $or: [{ id: id }, { guid: id }],
+        },
       });
-      
+
       if (!user) {
         return sendResponseWithData(
           res,
@@ -264,14 +264,14 @@ const controller = {
           null
         );
       }
-      
+
       await user.destroy();
-      
+
       let responseData = {
         status: "success",
-        message: "User deleted successfully"
+        message: "User deleted successfully",
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -294,28 +294,28 @@ const controller = {
       const { groupId } = req.params;
       const { page = 1, limit = 10, isActive } = req.query;
       const offset = (page - 1) * limit;
-      
+
       let whereClause = { groupId };
       if (isActive !== undefined) {
-        whereClause.isActive = isActive === 'true';
+        whereClause.isActive = isActive === "true";
       }
-      
+
       const users = await User.findAndCountAll({
         where: whereClause,
-        attributes: { exclude: ['password'] },
+        attributes: { exclude: ["password"] },
         limit: parseInt(limit),
         offset: parseInt(offset),
-        order: [['createdAt', 'DESC']]
+        order: [["createdAt", "DESC"]],
       });
-      
+
       let responseData = {
         status: "success",
         data: users.rows,
         count: users.count,
         currentPage: parseInt(page),
-        totalPages: Math.ceil(users.count / limit)
+        totalPages: Math.ceil(users.count / limit),
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -337,41 +337,41 @@ const controller = {
     try {
       const { search, page = 1, limit = 10 } = req.query;
       const offset = (page - 1) * limit;
-      
+
       let whereClause = {};
       if (search) {
         whereClause = {
           $or: [
             { email: { [Op.iLike]: `%${search}%` } },
             { firstName: { [Op.iLike]: `%${search}%` } },
-            { lastName: { [Op.iLike]: `%${search}%` } }
-          ]
+            { lastName: { [Op.iLike]: `%${search}%` } },
+          ],
         };
       }
-      
+
       const users = await User.findAndCountAll({
         where: whereClause,
         include: [
           {
             model: Group,
-            as: 'group',
-            attributes: ['id', 'name', 'logo']
-          }
+            as: "group",
+            attributes: ["id", "name", "logo"],
+          },
         ],
-        attributes: { exclude: ['password'] },
+        attributes: { exclude: ["password"] },
         limit: parseInt(limit),
         offset: parseInt(offset),
-        order: [['createdAt', 'DESC']]
+        order: [["createdAt", "DESC"]],
       });
-      
+
       let responseData = {
         status: "success",
         data: users.rows,
         count: users.count,
         currentPage: parseInt(page),
-        totalPages: Math.ceil(users.count / limit)
+        totalPages: Math.ceil(users.count / limit),
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -392,7 +392,7 @@ const controller = {
   getProfile: async function (req, res) {
     try {
       const userId = req.userId; // This should be set by auth middleware
-      
+
       if (!userId) {
         return sendResponseWithData(
           res,
@@ -401,18 +401,18 @@ const controller = {
           null
         );
       }
-      
+
       const user = await User.findByPk(userId, {
         include: [
           {
             model: Group,
-            as: 'group',
-            attributes: ['id', 'name', 'logo', 'description']
-          }
+            as: "group",
+            attributes: ["id", "name", "logo", "description"],
+          },
         ],
-        attributes: { exclude: ['password'] }
+        attributes: { exclude: ["password"] },
       });
-      
+
       if (!user) {
         return sendResponseWithData(
           res,
@@ -421,12 +421,12 @@ const controller = {
           null
         );
       }
-      
+
       let responseData = {
         status: "success",
         data: user,
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -448,7 +448,7 @@ const controller = {
     try {
       const userId = req.userId; // This should be set by auth middleware
       const data = req.body;
-      
+
       if (!userId) {
         return sendResponseWithData(
           res,
@@ -457,9 +457,9 @@ const controller = {
           null
         );
       }
-      
+
       const user = await User.findByPk(userId);
-      
+
       if (!user) {
         return sendResponseWithData(
           res,
@@ -468,17 +468,17 @@ const controller = {
           null
         );
       }
-      
+
       // Only allow updating certain fields for profile
-      const allowedFields = ['firstName', 'lastName', 'email'];
+      const allowedFields = ["firstName", "lastName", "email"];
       const updateData = {};
-      
-      allowedFields.forEach(field => {
+
+      allowedFields.forEach((field) => {
         if (data[field] !== undefined) {
           updateData[field] = data[field];
         }
       });
-      
+
       // Verify group exists if groupId is being updated
       if (data.groupId) {
         const group = await Group.findByPk(data.groupId);
@@ -492,19 +492,19 @@ const controller = {
         }
         updateData.groupId = data.groupId;
       }
-      
+
       await user.update(updateData);
       const updatedUser = await user.save();
-      
+
       // Remove password from response
       const userResponse = updatedUser.toJSON();
       delete userResponse.password;
-      
+
       let responseData = {
         status: "success",
         data: userResponse,
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -526,7 +526,7 @@ const controller = {
     try {
       const userId = req.userId; // This should be set by auth middleware
       const { currentPassword, newPassword } = req.body;
-      
+
       if (!userId) {
         return sendResponseWithData(
           res,
@@ -535,7 +535,7 @@ const controller = {
           null
         );
       }
-      
+
       if (!currentPassword || !newPassword) {
         return sendResponseWithData(
           res,
@@ -544,9 +544,9 @@ const controller = {
           null
         );
       }
-      
+
       const user = await User.findByPk(userId);
-      
+
       if (!user) {
         return sendResponseWithData(
           res,
@@ -555,9 +555,12 @@ const controller = {
           null
         );
       }
-      
+
       // Verify current password
-      const currentPasswordHash = crypto.createHash('sha256').update(currentPassword).digest('hex');
+      const currentPasswordHash = crypto
+        .createHash("sha256")
+        .update(currentPassword)
+        .digest("hex");
       if (user.password !== currentPasswordHash) {
         return sendResponseWithData(
           res,
@@ -566,19 +569,22 @@ const controller = {
           null
         );
       }
-      
+
       // Hash new password
-      const newPasswordHash = crypto.createHash('sha256').update(newPassword).digest('hex');
-      
+      const newPasswordHash = crypto
+        .createHash("sha256")
+        .update(newPassword)
+        .digest("hex");
+
       // Update password
       await user.update({ password: newPasswordHash });
       await user.save();
-      
+
       let responseData = {
         status: "success",
-        message: "Password changed successfully"
+        message: "Password changed successfully",
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -593,7 +599,7 @@ const controller = {
         err
       );
     }
-  }
+  },
 };
 
 module.exports = controller;

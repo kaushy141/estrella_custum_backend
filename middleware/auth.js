@@ -111,7 +111,7 @@ const authenticateToken = async (req, res, next) => {
     req.user = user;
     req.token = token;
     req.userId = user.id;
-    req.isSuperAdmin = user.isSuperAdmin;
+    req.isSuperAdmin = user.isSuperAdmin || false;
     req.groupId = user.groupId;
     
     next();
