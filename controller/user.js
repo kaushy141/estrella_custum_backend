@@ -86,6 +86,7 @@ const controller = {
       if (isActive !== undefined) {
         whereClause.isActive = isActive === "true";
       }
+        console.error("whereClause users",whereClause);
 
       const users = await User.findAndCountAll({
         where: whereClause,
