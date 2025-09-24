@@ -75,7 +75,7 @@ const controller = {
     try {
       const { page = 1, limit = 10, isActive } = req.query;
       const offset = (page - 1) * limit;
-
+      console.log("getAll called");
       const groupId = req.groupId;
       const isSuperAdmin = req.isSuperAdmin;
       let whereClause = {};
@@ -86,7 +86,7 @@ const controller = {
       if (isActive !== undefined) {
         whereClause.isActive = isActive === "true";
       }
-        console.log("whereClause users",whereClause);
+      console.log("whereClause users", whereClause);
 
       const users = await User.findAndCountAll({
         where: whereClause,
@@ -294,8 +294,8 @@ const controller = {
     try {
       const { page = 1, limit = 10, isActive } = req.query;
       const offset = (page - 1) * limit;
-      
-      let whereClause = {  };
+      console.log("getByGroup called");
+      let whereClause = {};
       const isSuperAdmin = req.isSuperAdmin;
       const groupId = req.groupId;
       whereClause.groupId = groupId;
@@ -344,6 +344,8 @@ const controller = {
       const offset = (page - 1) * limit;
 
       let whereClause = {};
+      console.log("search called");
+
       if (search) {
         whereClause = {
           $or: [
