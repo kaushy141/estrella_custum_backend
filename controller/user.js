@@ -5,6 +5,7 @@ const { SuccessCode, ErrorCode } = require("../helper/statusCode");
 const activityHelper = require("../helper/activityHelper");
 const crypto = require("crypto");
 const { Op } = require("sequelize");
+const _ = require("lodash");
 
 const controller = {
   // Create new user
@@ -66,10 +67,15 @@ const controller = {
   // Get all users
   getAll: async function (req, res) {
     try {
-      const { page = 1, limit = 10, groupId, isActive } = req.query;
+      const { page = 1, limit = 10, isActive } = req.query;
       const offset = (page - 1) * limit;
-      
+
+      const groupId = req.groupId;
+      const isSuperAdmin = req.isSuperAdmin;
       let whereClause = {};
+      if (isSuperAdmin) {
+        _.omit(whereClause, "groupId");
+      }
       if (groupId) whereClause.groupId = groupId;
       if (isActive !== undefined) {
         whereClause.isActive = isActive === 'true';
