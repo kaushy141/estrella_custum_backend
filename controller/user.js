@@ -292,15 +292,19 @@ const controller = {
   // Get users by group
   getByGroup: async function (req, res) {
     try {
-      const { groupId } = req.params;
       const { page = 1, limit = 10, isActive } = req.query;
       const offset = (page - 1) * limit;
-
-      let whereClause = { groupId };
+      
+      let whereClause = {  };
+      const isSuperAdmin = req.isSuperAdmin;
+      const groupId = req.groupId;
+      whereClause.groupId = groupId;
+      if (isSuperAdmin) {
+        _.omit(whereClause, "groupId");
+      }
       if (isActive !== undefined) {
         whereClause.isActive = isActive === "true";
       }
-
       const users = await User.findAndCountAll({
         where: whereClause,
         attributes: { exclude: ["password"] },
