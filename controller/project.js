@@ -4,6 +4,7 @@ const { sendResponseWithData } = require("../helper/commonResponseHandler");
 const { SuccessCode, ErrorCode } = require("../helper/statusCode");
 const activityHelper = require("../helper/activityHelper");
 const _ = require("lodash");
+const AIHelper = require("../helper/ai-helper.js");
 const controller = {
   // Create new project
   create: async function (req, res) {
@@ -21,6 +22,9 @@ const controller = {
       }
       data.groupId = group.id;
       const project = await Project.create(data);
+
+      //Create AI Thread
+      AIHelper.createProjectAIThread(project.id);
       // Log activity
       try {
         await activityHelper.logProjectCreation(project, req.userId || data.createdBy || 1);
