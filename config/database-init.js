@@ -47,6 +47,10 @@ async function initializeDatabase() {
   try {
     console.log('🔄 Starting database initialization...');
 
+    // Test database connection first
+    await sequelize.authenticate();
+    console.log('✅ Database connection established successfully');
+
     // Disable foreign key checks
     await sequelize.query("SET FOREIGN_KEY_CHECKS = 0");
 
@@ -65,9 +69,19 @@ async function initializeDatabase() {
       const model = models[modelName];
       if (model) {
         console.log(`📋 Syncing ${modelName} table...`);
-        // First try to sync with alter: true to update existing tables
-        // If table doesn't exist, it will be created automatically
-        await model.sync({ alter: true });
+
+        // Check if table exists first
+        const tableName = model.getTableName();
+        const [tables] = await sequelize.query(`SHOW TABLES LIKE '${tableName}'`);
+
+        if (tables.length === 0) {
+          console.log(`   Table ${tableName} doesn't exist, creating...`);
+          await model.sync({ force: false });
+        } else {
+          console.log(`   Table ${tableName} exists, updating...`);
+          await model.sync({ alter: true });
+        }
+
         console.log(`✅ ${modelName} table synced successfully`);
       }
     }
