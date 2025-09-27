@@ -16,12 +16,12 @@ const { ActivityLog } = require('../models/activity-log-model');
 // Define the order of table creation (parent tables first)
 const syncOrder = [
   'Group',
-  'User', 
+  'User',
   'Project',
   'Invoice',
   'ShippingService',
   'CustomAgent',
-  'CustomClearance', 
+  'CustomClearance',
   'CustomDeclaration',
   'CourierReceipt',
   'GroupAddress',
@@ -46,10 +46,10 @@ const models = {
 async function initializeDatabase() {
   try {
     console.log('🔄 Starting database initialization...');
-    
+
     // Disable foreign key checks
     await sequelize.query("SET FOREIGN_KEY_CHECKS = 0");
-    
+
     // Clean up orphaned records in ActivityLog before syncing
     // console.log('🧹 Cleaning up orphaned ActivityLog records...');
     // await sequelize.query(`
@@ -59,32 +59,34 @@ async function initializeDatabase() {
     //   AND projectId NOT IN (SELECT id FROM projects)
     // `);
     // console.log('✅ Orphaned ActivityLog records cleaned up');
-    
+
     // Sync models in order to avoid foreign key constraint issues
     for (const modelName of syncOrder) {
       const model = models[modelName];
       if (model) {
         console.log(`📋 Syncing ${modelName} table...`);
+        // First try to sync with alter: true to update existing tables
+        // If table doesn't exist, it will be created automatically
         await model.sync({ alter: true });
         console.log(`✅ ${modelName} table synced successfully`);
       }
     }
-    
+
     // Re-enable foreign key checks
     await sequelize.query("SET FOREIGN_KEY_CHECKS = 1");
-    
+
     console.log('🎉 Database initialization completed successfully!');
     return true;
   } catch (error) {
     console.error('❌ Database initialization failed:', error);
-    
+
     // Ensure foreign key checks are re-enabled even on error
     try {
       await sequelize.query("SET FOREIGN_KEY_CHECKS = 1");
     } catch (fkError) {
       console.error('Failed to re-enable foreign key checks:', fkError);
     }
-    
+
     throw error;
   }
 }
