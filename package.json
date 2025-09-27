@@ -10,7 +10,8 @@
     "setup-ai-webhook": "node scripts/setup-ai-webhook.js",
     "create-ai-agent": "node scripts/create-ai-agent.js",
     "setup-database": "node scripts/setup-database.js",
-    "reset-database": "node scripts/reset-database.js"
+    "reset-database": "node scripts/reset-database.js",
+    "debug-project": "node scripts/debug-project-table.js"
   },
   "keywords": [
     "nodejs",

@@ -70,19 +70,38 @@ async function initializeDatabase() {
       if (model) {
         console.log(`📋 Syncing ${modelName} table...`);
 
-        // Check if table exists first
-        const tableName = model.getTableName();
-        const [tables] = await sequelize.query(`SHOW TABLES LIKE '${tableName}'`);
+        try {
+          // Check if table exists first
+          const tableName = model.getTableName();
+          const [tables] = await sequelize.query(`SHOW TABLES LIKE '${tableName}'`);
 
-        if (tables.length === 0) {
-          console.log(`   Table ${tableName} doesn't exist, creating...`);
-          await model.sync({ force: false });
-        } else {
-          console.log(`   Table ${tableName} exists, updating...`);
-          await model.sync({ alter: true });
+          if (tables.length === 0) {
+            console.log(`   Table ${tableName} doesn't exist, force creating...`);
+            await model.sync({ force: true });
+            console.log(`   ✅ Table ${tableName} force created successfully`);
+          } else {
+            console.log(`   Table ${tableName} exists, updating...`);
+            await model.sync({ alter: true });
+            console.log(`   ✅ Table ${tableName} updated successfully`);
+          }
+
+          console.log(`✅ ${modelName} table synced successfully`);
+        } catch (error) {
+          console.error(`❌ Error syncing ${modelName} table:`, error.message);
+          console.error(`   Full error:`, error);
+
+          // If alter fails, try force create as fallback
+          console.log(`   🔄 Attempting force create as fallback...`);
+          try {
+            await model.sync({ force: true });
+            console.log(`   ✅ Table ${tableName} force created successfully (fallback)`);
+          } catch (forceError) {
+            console.error(`   ❌ Force create also failed:`, forceError.message);
+            throw forceError;
+          }
         }
-
-        console.log(`✅ ${modelName} table synced successfully`);
+      } else {
+        console.warn(`⚠️  Model ${modelName} not found in models object`);
       }
     }
 
