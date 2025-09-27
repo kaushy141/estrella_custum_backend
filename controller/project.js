@@ -5,6 +5,7 @@ const { SuccessCode, ErrorCode } = require("../helper/statusCode");
 const activityHelper = require("../helper/activityHelper");
 const _ = require("lodash");
 const AIHelper = require("../helper/ai-helper.js");
+const openAIHelper = require("../helper/openai-helper.js");
 const controller = {
   // Create new project
   create: async function (req, res) {
@@ -23,8 +24,9 @@ const controller = {
       data.groupId = group.id;
       const project = await Project.create(data);
 
-      //Create AI Thread
-      AIHelper.createProjectAIThread(project.id);
+      const conversationId = await openAIHelper.createConversationId();
+      project.aiConversation = conversationId;
+      await project.save();
       // Log activity
       try {
         await activityHelper.logProjectCreation(project, req.userId || data.createdBy || 1);
@@ -60,7 +62,7 @@ const controller = {
       const { page = 1, limit = 10, status, isActive } = req.query;
       const offset = (page - 1) * limit;
 
-      
+
       let whereClause = {};
       const groupId = req.groupId;
       const isSuperAdmin = req.isSuperAdmin;

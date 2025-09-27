@@ -7,6 +7,7 @@ const activityHelper = require("../helper/activityHelper");
 const { translateDocument } = require("../services/doc-translation.service");
 const commonHelper = require("../helper/common-helper");
 const _ = require("lodash");
+const openAIHelper = require("../helper/openai-helper");
 const controller = {
   // Create new invoice
   create: async function (req, res) {
@@ -103,7 +104,7 @@ const controller = {
           null
         );
       }
-     
+
       let whereClause = {};
       whereClause.projectId = project.id;
       whereClause.groupId = groupId;
@@ -144,7 +145,7 @@ const controller = {
         responseData
       );
     } catch (err) {
-      console.log("sdfsdfsdf",err);
+      console.log("sdfsdfsdf", err);
       return sendResponseWithData(
         res,
         ErrorCode.REQUEST_FAILED,
@@ -293,7 +294,7 @@ const controller = {
 
       const invoice = await Invoice.findOne({
         where: {
-          $or: [ { guid: id }],
+          $or: [{ guid: id }],
         },
       });
 
@@ -450,6 +451,24 @@ const controller = {
             where: { id: invoice.id },
           }
         );
+
+        //create payload of saved originalFile 
+
+        // Start translation in background
+        const translationPromise = openAIHelper.translateInvoice({
+          id: invoice.id,
+          filePath: invoice.originalFilePath,
+          fileName: invoice.originalFileName,
+          language: project.language,
+          translatedLanguage: project.translatedLanguage,
+          currency: project.currency,
+          exchangeCurrency: project.exchangeCurrency,
+          exchangeRate: project.exchangeRate,
+        },
+          project.aiConversation
+        );
+
+
         // call the translate api
         // const translatedInvoice = await translateDocument({
         //   taskId: "Invoice",

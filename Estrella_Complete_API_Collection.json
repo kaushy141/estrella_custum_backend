@@ -1,0 +1,2915 @@
+{
+  "info": {
+    "name": "Estrella Custom Backend - Complete API Collection",
+    "description": "Complete API collection for Estrella Custom Backend with all routes, query parameters, and request bodies",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "3.0.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3002/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "ai_webhook_token",
+      "value": "ai_agent_secure_token_2024",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔐 Authentication",
+      "item": [
+        {
+          "name": "User Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.data && response.data.token) {",
+                  "        pm.collectionVariables.set('jwt_token', response.data.token);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "User Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "logout"]
+            }
+          }
+        },
+        {
+          "name": "Verify Token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/verify",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "verify"]
+            }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/refresh",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "refresh"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "👥 User Management",
+      "item": [
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"email\": \"john.doe@example.com\",\n  \"password\": \"password123\",\n  \"groupId\": 1,\n  \"isAdmin\": false,\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/user",
+              "host": ["{{base_url}}"],
+              "path": ["user"]
+            }
+          }
+        },
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/user?page=1&limit=10&sortBy=createdAt&sortOrder=desc&groupId=1&isActive=true&search=john",
+              "host": ["{{base_url}}"],
+              "path": ["user"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number for pagination"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Number of items per page"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt",
+                  "description": "Field to sort by"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "desc",
+                  "description": "Sort order (asc/desc)"
+                },
+                {
+                  "key": "groupId",
+                  "value": "1",
+                  "description": "Filter by group ID",
+                  "disabled": true
+                },
+                {
+                  "key": "isActive",
+                  "value": "true",
+                  "description": "Filter by active status",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "john",
+                  "description": "Search in firstName, lastName, email",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/user/:id",
+              "host": ["{{base_url}}"],
+              "path": ["user", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "User ID or GUID"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Smith\",\n  \"email\": \"jane.smith@example.com\",\n  \"isAdmin\": true,\n  \"isActive\": true,\n  \"groupId\": 2\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/user/:id",
+              "host": ["{{base_url}}"],
+              "path": ["user", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/user/:id",
+              "host": ["{{base_url}}"],
+              "path": ["user", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Users by Group",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/user/group/:groupId?page=1&limit=10&sortBy=firstName&sortOrder=asc",
+              "host": ["{{base_url}}"],
+              "path": ["user", "group", ":groupId"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "firstName"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "asc"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "groupId",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/user/search?search=john&page=1&limit=10&groupId=1&isActive=true",
+              "host": ["{{base_url}}"],
+              "path": ["user", "search"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "john",
+                  "description": "Search term for firstName, lastName, email"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "groupId",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "isActive",
+                  "value": "true",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get User Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/user/profile",
+              "host": ["{{base_url}}"],
+              "path": ["user", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Update User Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Updated First\",\n  \"lastName\": \"Updated Last\",\n  \"email\": \"updated@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/user/profile",
+              "host": ["{{base_url}}"],
+              "path": ["user", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"oldPassword123\",\n  \"newPassword\": \"newPassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/user/change-password",
+              "host": ["{{base_url}}"],
+              "path": ["user", "change-password"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏷️ Group Management",
+      "item": [
+        {
+          "name": "Create Group",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Group\",\n  \"description\": \"A test group for development\",\n  \"logo\": \"https://example.com/logo.png\",\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/group",
+              "host": ["{{base_url}}"],
+              "path": ["group"]
+            }
+          }
+        },
+        {
+          "name": "Get All Groups",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/group?page=1&limit=10&sortBy=name&sortOrder=asc&isActive=true&search=test",
+              "host": ["{{base_url}}"],
+              "path": ["group"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "name"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "asc"
+                },
+                {
+                  "key": "isActive",
+                  "value": "true",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "test",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Group by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/group/:id",
+              "host": ["{{base_url}}"],
+              "path": ["group", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Group",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Group Name\",\n  \"description\": \"Updated group description\",\n  \"logo\": \"https://example.com/new-logo.png\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/group/:id",
+              "host": ["{{base_url}}"],
+              "path": ["group", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Group",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/group/:id",
+              "host": ["{{base_url}}"],
+              "path": ["group", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Deactivate Group",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/group/:id/deactivate",
+              "host": ["{{base_url}}"],
+              "path": ["group", ":id", "deactivate"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Activate Group",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/group/:id/activate",
+              "host": ["{{base_url}}"],
+              "path": ["group", ":id", "activate"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📋 Project Management",
+      "item": [
+        {
+          "name": "Create Project",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Test Project\",\n  \"description\": \"A test project for development\",\n  \"status\": \"active\",\n  \"groupId\": 1,\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/project",
+              "host": ["{{base_url}}"],
+              "path": ["project"]
+            }
+          }
+        },
+        {
+          "name": "Get All Projects",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/project?page=1&limit=10&sortBy=title&sortOrder=asc&groupId=1&status=active&search=test",
+              "host": ["{{base_url}}"],
+              "path": ["project"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "title"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "asc"
+                },
+                {
+                  "key": "groupId",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "active",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "test",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Project by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/project/:id",
+              "host": ["{{base_url}}"],
+              "path": ["project", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Project",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Project Title\",\n  \"description\": \"Updated project description\",\n  \"status\": \"completed\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/project/:id",
+              "host": ["{{base_url}}"],
+              "path": ["project", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Project",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/project/:id",
+              "host": ["{{base_url}}"],
+              "path": ["project", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Projects by Group",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/project/group/:groupId?page=1&limit=10&status=active",
+              "host": ["{{base_url}}"],
+              "path": ["project", "group", ":groupId"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "status",
+                  "value": "active",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "groupId",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🧾 Invoice Management",
+      "item": [
+        {
+          "name": "Create Invoice (with files)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "files[]",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "projectId",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "groupId",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "originalFilePath",
+                  "value": "/uploads/invoices/original.pdf",
+                  "type": "text"
+                },
+                {
+                  "key": "translatedFilePath",
+                  "value": "/uploads/invoices/translated.pdf",
+                  "type": "text"
+                },
+                {
+                  "key": "originalFileContent",
+                  "value": "Original invoice content...",
+                  "type": "text"
+                },
+                {
+                  "key": "translatedFileContent",
+                  "value": "Translated invoice content...",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/invoice",
+              "host": ["{{base_url}}"],
+              "path": ["invoice"]
+            }
+          }
+        },
+        {
+          "name": "Get All Invoices",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/invoice?page=1&limit=10&sortBy=createdAt&sortOrder=desc&projectId=1&groupId=1",
+              "host": ["{{base_url}}"],
+              "path": ["invoice"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "desc"
+                },
+                {
+                  "key": "projectId",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "groupId",
+                  "value": "1",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Invoice by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/invoice/:id",
+              "host": ["{{base_url}}"],
+              "path": ["invoice", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Invoice (with files)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "originalFiles[]",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "translatedFiles[]",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "originalFilePath",
+                  "value": "/uploads/invoices/updated-original.pdf",
+                  "type": "text"
+                },
+                {
+                  "key": "translatedFilePath",
+                  "value": "/uploads/invoices/updated-translated.pdf",
+                  "type": "text"
+                },
+                {
+                  "key": "originalFileContent",
+                  "value": "Updated original content...",
+                  "type": "text"
+                },
+                {
+                  "key": "translatedFileContent",
+                  "value": "Updated translated content...",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/invoice/:id",
+              "host": ["{{base_url}}"],
+              "path": ["invoice", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Invoice",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/invoice/:id",
+              "host": ["{{base_url}}"],
+              "path": ["invoice", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Invoices by Project",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/invoice/project/:projectId?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["invoice", "project", ":projectId"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "projectId",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Invoices by Group",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/invoice/group/:groupId?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["invoice", "group", ":groupId"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "groupId",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Translate Invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetLanguage\": \"en\",\n  \"sourceLanguage\": \"es\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/invoice/translate/:id",
+              "host": ["{{base_url}}"],
+              "path": ["invoice", "translate", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🚢 Shipping Service Management",
+      "item": [
+        {
+          "name": "Create Shipping Service",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Express Shipping\",\n  \"groupId\": 1,\n  \"email\": \"express@shipping.com\",\n  \"phone\": \"+1234567890\",\n  \"address\": \"123 Shipping St\",\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/shipping-service",
+              "host": ["{{base_url}}"],
+              "path": ["shipping-service"]
+            }
+          }
+        },
+        {
+          "name": "Get All Shipping Services",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/shipping-service?page=1&limit=10&sortBy=name&sortOrder=asc&groupId=1&isActive=true",
+              "host": ["{{base_url}}"],
+              "path": ["shipping-service"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "name"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "asc"
+                },
+                {
+                  "key": "groupId",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "isActive",
+                  "value": "true",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Shipping Service by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/shipping-service/:id",
+              "host": ["{{base_url}}"],
+              "path": ["shipping-service", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Shipping Service",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Express Shipping\",\n  \"email\": \"updated@shipping.com\",\n  \"phone\": \"+1987654321\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/shipping-service/:id",
+              "host": ["{{base_url}}"],
+              "path": ["shipping-service", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Shipping Service",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/shipping-service/:id",
+              "host": ["{{base_url}}"],
+              "path": ["shipping-service", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Shipping Services by Group",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/shipping-service/group/:groupId?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["shipping-service", "group", ":groupId"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "groupId",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "👨‍💼 Custom Agent Management",
+      "item": [
+        {
+          "name": "Create Custom Agent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Custom Agent Ltd\",\n  \"groupId\": 1,\n  \"email\": \"agent@custom.com\",\n  \"phone\": \"+1234567890\",\n  \"address\": \"123 Agent St\",\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/custom-agent",
+              "host": ["{{base_url}}"],
+              "path": ["custom-agent"]
+            }
+          }
+        },
+        {
+          "name": "Get All Custom Agents",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/custom-agent?page=1&limit=10&sortBy=name&sortOrder=asc&groupId=1&isActive=true",
+              "host": ["{{base_url}}"],
+              "path": ["custom-agent"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "name"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "asc"
+                },
+                {
+                  "key": "groupId",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "isActive",
+                  "value": "true",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Custom Agent by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/custom-agent/:id",
+              "host": ["{{base_url}}"],
+              "path": ["custom-agent", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Custom Agent",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Custom Agent Ltd\",\n  \"email\": \"updated@custom.com\",\n  \"phone\": \"+1987654321\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/custom-agent/:id",
+              "host": ["{{base_url}}"],
+              "path": ["custom-agent", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Custom Agent",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/custom-agent/:id",
+              "host": ["{{base_url}}"],
+              "path": ["custom-agent", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Custom Agents by Group",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/custom-agent/group/:groupId?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["custom-agent", "group", ":groupId"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "groupId",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🛃 Custom Clearance Management",
+      "item": [
+        {
+          "name": "Create Custom Clearance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"projectId\": 1,\n  \"groupId\": 1,\n  \"filePath\": \"/uploads/clearance/clearance.pdf\",\n  \"fileContent\": \"Custom clearance content...\",\n  \"insights\": \"Clearance insights and analysis...\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/custom-clearance",
+              "host": ["{{base_url}}"],
+              "path": ["custom-clearance"]
+            }
+          }
+        },
+        {
+          "name": "Get All Custom Clearances",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/custom-clearance?page=1&limit=10&sortBy=createdAt&sortOrder=desc&projectId=1&groupId=1",
+              "host": ["{{base_url}}"],
+              "path": ["custom-clearance"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "desc"
+                },
+                {
+                  "key": "projectId",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "groupId",
+                  "value": "1",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Custom Clearance by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/custom-clearance/:id",
+              "host": ["{{base_url}}"],
+              "path": ["custom-clearance", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Custom Clearance",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"filePath\": \"/uploads/clearance/updated-clearance.pdf\",\n  \"fileContent\": \"Updated clearance content...\",\n  \"insights\": \"Updated insights and analysis...\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/custom-clearance/:id",
+              "host": ["{{base_url}}"],
+              "path": ["custom-clearance", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Custom Clearance",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/custom-clearance/:id",
+              "host": ["{{base_url}}"],
+              "path": ["custom-clearance", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Clearances by Project",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/custom-clearance/project/:projectId?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["custom-clearance", "project", ":projectId"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "projectId",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Clearances by Group",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/custom-clearance/group/:groupId?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["custom-clearance", "group", ":groupId"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "groupId",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📋 Custom Declaration Management",
+      "item": [
+        {
+          "name": "Create Custom Declaration (with files)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "files[]",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "projectId",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "groupId",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "filePath",
+                  "value": "/uploads/declaration/declaration.pdf",
+                  "type": "text"
+                },
+                {
+                  "key": "fileContent",
+                  "value": "Custom declaration content...",
+                  "type": "text"
+                },
+                {
+                  "key": "insights",
+                  "value": "Declaration insights and analysis...",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/custom-declaration",
+              "host": ["{{base_url}}"],
+              "path": ["custom-declaration"]
+            }
+          }
+        },
+        {
+          "name": "Get All Custom Declarations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/custom-declaration?page=1&limit=10&sortBy=createdAt&sortOrder=desc&projectId=1&groupId=1",
+              "host": ["{{base_url}}"],
+              "path": ["custom-declaration"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "desc"
+                },
+                {
+                  "key": "projectId",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "groupId",
+                  "value": "1",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Custom Declaration by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/custom-declaration/:id",
+              "host": ["{{base_url}}"],
+              "path": ["custom-declaration", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Custom Declaration",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"filePath\": \"/uploads/declaration/updated-declaration.pdf\",\n  \"fileContent\": \"Updated declaration content...\",\n  \"insights\": \"Updated insights and analysis...\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/custom-declaration/:id",
+              "host": ["{{base_url}}"],
+              "path": ["custom-declaration", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Custom Declaration",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/custom-declaration/:id",
+              "host": ["{{base_url}}"],
+              "path": ["custom-declaration", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Declarations by Project",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/custom-declaration/project/:projectId?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["custom-declaration", "project", ":projectId"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "projectId",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Declarations by Group",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/custom-declaration/group/:groupId?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["custom-declaration", "group", ":groupId"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "groupId",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📦 Courier Receipt Management",
+      "item": [
+        {
+          "name": "Create Courier Receipt (with files)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "files[]",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "projectId",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "groupId",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "filePath",
+                  "value": "/uploads/courier/receipt.pdf",
+                  "type": "text"
+                },
+                {
+                  "key": "fileContent",
+                  "value": "Courier receipt content...",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/courier-receipt",
+              "host": ["{{base_url}}"],
+              "path": ["courier-receipt"]
+            }
+          }
+        },
+        {
+          "name": "Get All Courier Receipts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courier-receipt?page=1&limit=10&sortBy=createdAt&sortOrder=desc&projectId=1&groupId=1",
+              "host": ["{{base_url}}"],
+              "path": ["courier-receipt"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "desc"
+                },
+                {
+                  "key": "projectId",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "groupId",
+                  "value": "1",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Courier Receipt by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courier-receipt/:id",
+              "host": ["{{base_url}}"],
+              "path": ["courier-receipt", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Courier Receipt",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"filePath\": \"/uploads/courier/updated-receipt.pdf\",\n  \"fileContent\": \"Updated courier receipt content...\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/courier-receipt/:id",
+              "host": ["{{base_url}}"],
+              "path": ["courier-receipt", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Courier Receipt",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courier-receipt/:id",
+              "host": ["{{base_url}}"],
+              "path": ["courier-receipt", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Receipts by Project",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courier-receipt/project/:projectId?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["courier-receipt", "project", ":projectId"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "projectId",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Receipts by Group",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courier-receipt/group/:groupId?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["courier-receipt", "group", ":groupId"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "groupId",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📍 Group Address Management",
+      "item": [
+        {
+          "name": "Create Group Address",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"groupId\": 1,\n  \"address\": \"123 Main Street\",\n  \"city\": \"New York\",\n  \"state\": \"NY\",\n  \"zip\": \"10001\",\n  \"country\": \"USA\",\n  \"contactName\": \"John Doe\",\n  \"contactPhone\": \"+1234567890\",\n  \"contactEmail\": \"john@example.com\",\n  \"latitude\": \"40.7128\",\n  \"longitude\": \"-74.0060\",\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/group-address",
+              "host": ["{{base_url}}"],
+              "path": ["group-address"]
+            }
+          }
+        },
+        {
+          "name": "Get All Group Addresses",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/group-address?page=1&limit=10&sortBy=city&sortOrder=asc&groupId=1&country=USA&isActive=true",
+              "host": ["{{base_url}}"],
+              "path": ["group-address"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "city"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "asc"
+                },
+                {
+                  "key": "groupId",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "country",
+                  "value": "USA",
+                  "disabled": true
+                },
+                {
+                  "key": "isActive",
+                  "value": "true",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Group Address by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/group-address/:id",
+              "host": ["{{base_url}}"],
+              "path": ["group-address", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Group Address",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"address\": \"456 Updated Street\",\n  \"city\": \"Los Angeles\",\n  \"state\": \"CA\",\n  \"zip\": \"90210\",\n  \"contactPhone\": \"+1987654321\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/group-address/:id",
+              "host": ["{{base_url}}"],
+              "path": ["group-address", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Group Address",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/group-address/:id",
+              "host": ["{{base_url}}"],
+              "path": ["group-address", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Addresses by Group",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/group-address/group/:groupId?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["group-address", "group", ":groupId"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "groupId",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Addresses by Location",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/group-address/search/location?lat=40.7128&lng=-74.0060&radius=10&city=New York&state=NY&country=USA",
+              "host": ["{{base_url}}"],
+              "path": ["group-address", "search", "location"],
+              "query": [
+                {
+                  "key": "lat",
+                  "value": "40.7128",
+                  "description": "Latitude for location search",
+                  "disabled": true
+                },
+                {
+                  "key": "lng",
+                  "value": "-74.0060",
+                  "description": "Longitude for location search",
+                  "disabled": true
+                },
+                {
+                  "key": "radius",
+                  "value": "10",
+                  "description": "Search radius in miles",
+                  "disabled": true
+                },
+                {
+                  "key": "city",
+                  "value": "New York",
+                  "description": "Filter by city"
+                },
+                {
+                  "key": "state",
+                  "value": "NY",
+                  "description": "Filter by state",
+                  "disabled": true
+                },
+                {
+                  "key": "country",
+                  "value": "USA",
+                  "description": "Filter by country",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📊 Activity Log Management",
+      "item": [
+        {
+          "name": "Create Activity Log",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"projectId\": 1,\n  \"groupId\": 1,\n  \"action\": \"USER_LOGIN\",\n  \"description\": \"User logged in successfully\",\n  \"createdBy\": 1,\n  \"metadata\": {\n    \"ip\": \"192.168.1.1\",\n    \"userAgent\": \"Mozilla/5.0...\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/activity-log",
+              "host": ["{{base_url}}"],
+              "path": ["activity-log"]
+            }
+          }
+        },
+        {
+          "name": "Get All Activity Logs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/activity-log?page=1&limit=10&sortBy=createdAt&sortOrder=desc&action=USER_LOGIN&projectId=1&groupId=1&createdBy=1",
+              "host": ["{{base_url}}"],
+              "path": ["activity-log"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "desc"
+                },
+                {
+                  "key": "action",
+                  "value": "USER_LOGIN",
+                  "disabled": true
+                },
+                {
+                  "key": "projectId",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "groupId",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "createdBy",
+                  "value": "1",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Activity Log by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/activity-log/:id",
+              "host": ["{{base_url}}"],
+              "path": ["activity-log", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Activity Log",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated activity log description\",\n  \"metadata\": {\n    \"updated\": true,\n    \"reason\": \"Corrected information\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/activity-log/:id",
+              "host": ["{{base_url}}"],
+              "path": ["activity-log", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Activity Log",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/activity-log/:id",
+              "host": ["{{base_url}}"],
+              "path": ["activity-log", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Activity Logs by Project",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/activity-log/project/:projectId?page=1&limit=10&action=PROJECT_UPDATE",
+              "host": ["{{base_url}}"],
+              "path": ["activity-log", "project", ":projectId"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "action",
+                  "value": "PROJECT_UPDATE",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "projectId",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Activity Logs by Group",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/activity-log/group/:groupId?page=1&limit=10&action=GROUP_UPDATE",
+              "host": ["{{base_url}}"],
+              "path": ["activity-log", "group", ":groupId"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "action",
+                  "value": "GROUP_UPDATE",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "groupId",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Activity Logs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/activity-log/search?search=login&page=1&limit=10&action=USER_LOGIN&dateFrom=2024-01-01&dateTo=2024-12-31",
+              "host": ["{{base_url}}"],
+              "path": ["activity-log", "search"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "login",
+                  "description": "Search in action and description"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "action",
+                  "value": "USER_LOGIN",
+                  "disabled": true
+                },
+                {
+                  "key": "dateFrom",
+                  "value": "2024-01-01",
+                  "description": "Filter from date (YYYY-MM-DD)",
+                  "disabled": true
+                },
+                {
+                  "key": "dateTo",
+                  "value": "2024-12-31",
+                  "description": "Filter to date (YYYY-MM-DD)",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🤖 AI Webhook Endpoints",
+      "item": [
+        {
+          "name": "AI Webhook Health Check",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-AI-Token",
+                "value": "{{ai_webhook_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ai-webhook/health",
+              "host": ["{{base_url}}"],
+              "path": ["ai-webhook", "health"]
+            }
+          }
+        },
+        {
+          "name": "Update Invoice Content",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-AI-Token",
+                "value": "{{ai_webhook_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"invoiceId\": 1,\n  \"translatedFilePath\": \"/ai/translated/invoice_1.pdf\",\n  \"originalFileContent\": \"AI processed original content...\",\n  \"translatedFileContent\": \"AI generated translation...\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/ai-webhook/invoice/update",
+              "host": ["{{base_url}}"],
+              "path": ["ai-webhook", "invoice", "update"]
+            }
+          }
+        },
+        {
+          "name": "Bulk Update Invoices",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-AI-Token",
+                "value": "{{ai_webhook_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"updates\": [\n    {\n      \"invoiceId\": 1,\n      \"translatedFilePath\": \"/ai/translated/invoice_1.pdf\",\n      \"originalFileContent\": \"AI processed content 1...\",\n      \"translatedFileContent\": \"AI translation 1...\"\n    },\n    {\n      \"invoiceId\": 2,\n      \"translatedFilePath\": \"/ai/translated/invoice_2.pdf\",\n      \"originalFileContent\": \"AI processed content 2...\",\n      \"translatedFileContent\": \"AI translation 2...\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/ai-webhook/invoice/bulk-update",
+              "host": ["{{base_url}}"],
+              "path": ["ai-webhook", "invoice", "bulk-update"]
+            }
+          }
+        },
+        {
+          "name": "Update Courier Receipt Content",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-AI-Token",
+                "value": "{{ai_webhook_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receiptId\": 1,\n  \"fileContent\": \"AI processed courier receipt content...\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/ai-webhook/courier-receipt/update",
+              "host": ["{{base_url}}"],
+              "path": ["ai-webhook", "courier-receipt", "update"]
+            }
+          }
+        },
+        {
+          "name": "Update Custom Clearance Content",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-AI-Token",
+                "value": "{{ai_webhook_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clearanceId\": 1,\n  \"fileContent\": \"AI processed clearance content...\",\n  \"insights\": \"AI generated insights about the clearance...\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/ai-webhook/custom-clearance/update",
+              "host": ["{{base_url}}"],
+              "path": ["ai-webhook", "custom-clearance", "update"]
+            }
+          }
+        },
+        {
+          "name": "Update Custom Declaration Content",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-AI-Token",
+                "value": "{{ai_webhook_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"declarationId\": 1,\n  \"fileContent\": \"AI processed declaration content...\",\n  \"insights\": \"AI generated insights about the declaration...\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/ai-webhook/custom-declaration/update",
+              "host": ["{{base_url}}"],
+              "path": ["ai-webhook", "custom-declaration", "update"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏥 Health Check",
+      "item": [
+        {
+          "name": "Server Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3002/health",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3002",
+              "path": ["health"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
