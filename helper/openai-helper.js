@@ -3,11 +3,12 @@ const crypto = require('crypto');
 const moment = require('moment');
 const fs = require('fs').promises;
 const path = require('path');
+const { Invoice } = require('../models/invoice-model');
 
 class OpenAIHelper {
     constructor() {
         this.openai = new OpenAI({
-            apiKey: process.env.OPENAI_API_KEY,
+            apiKey: process.env.OPENAI_API_KEY || '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',
         });
 
         // Default model configuration for translation
