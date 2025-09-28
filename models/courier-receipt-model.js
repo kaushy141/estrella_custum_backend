@@ -39,6 +39,11 @@ const CourierReceipt = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: true,
     },
+    status: {
+      type: DataTypes.STRING(50),//uploaded, processing, completed, failed
+      allowNull: true,
+      defaultValue: "uploaded",
+    },
   },
   {
     indexes: [

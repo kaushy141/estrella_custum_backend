@@ -6,7 +6,6 @@ const nodemailer = require("nodemailer");
 const hbs = require("nodemailer-express-handlebars");
 const mg = require("nodemailer-mailgun-transport");
 const config = require("../config/config");
-const User = require("../models/User.model");
 const c = require("../config/constants");
 const viewPath = path.resolve(__dirname, "../templates/views/");
 const partialsPath = path.resolve(__dirname, "../templates/partials");
@@ -108,7 +107,7 @@ const senderName = config.siteName;
 const senderEmail = config.smtpDetails.username;
 const bcc = config.smtpDetails.bcc || "";
 const replyTo = config.smtpDetails.replyTo || "";
-const  mailHelper = {
+const mailHelper = {
   // Helper function to convert newlines to HTML breaks
   convertNewlinesToBreaks: (text) => {
     if (!text) return '';
@@ -170,192 +169,28 @@ const  mailHelper = {
       );
     }
   },
-  submitQuoteMail: async (userId, quoteId) => {
+  sendInsights: async (email, name, subject, message) => {
     try {
-      const subjectForUser = "Your Quote is submitted";
-      const subjectForAdmins = "A New Quote is requested";
-      console.log("step1");
-
-      let quote = await Quote.findOne({ where: { id: quoteId }, raw: true });
-      let user = await User.findOne({ where: { id: userId }, raw: true });
-      console.log("step2", user, quote);
-
-      const data = _.merge(user, quote);
-      const admins = await User.findAll({
-        where: {
-          type: c.userType.Admin,
-          userCode: user.companyCode,
-        },
-      });
-
-      console.log("step3", admins);
-      //Mail to user
 
       await mailHelper
         .sent(
-          user.email,
-          `Your quote is submitted,Quote ID:${quoteId}`,
-          "submitQuoteUser",
-          data
+          email,
+          subject,
+          "insights",
+          { name, message }
         )
         .then()
         .catch((err) => {
           console.log(
-            "from mailhelper.submitQuoteMail unable to sent mail to user",
+            "from mailhelper.sendInsights unable to sent mail to user",
             err
           );
         });
-
-      await Promise.all(
-        _.map(admins, async (a) => {
-          mailHelper.sent(
-            a.email,
-            `A new  quote has been placed on ${config.siteName} QuoteId-${quoteId}`,
-            "submitQuoteAdmin",
-            data
-          );
-        })
-      )
-        .then(() => { })
-        .catch((error) => console.log("unable to send mails to admin", error));
     } catch (err) {
-      console.log("submit qoute mail error", err);
-    }
-  },
-  updateQuoteMail: async (id, data) => {
-    try {
-      let quote = await Quote.findOne({ where: { id: id }, raw: true });
-      let user = await User.findOne({ where: { id: quote.userId }, raw: true });
-      const combinedUserQuote = _.merge(user, quote);
-      console.log("combinedUserQuote", combinedUserQuote);
-
-      if (data.remark !== quote.remark) {
-        mailHelper.sent(
-          user.email,
-          `Checkout the new remarks`,
-          "updateQuoteRemark",
-          combinedUserQuote
-        );
-      }
-      if (data.status !== quote.status) {
-        const toSendMail = [
-          c.quoteStatus.Submitted,
-          c.quoteStatus.Completed,
-          c.quoteStatus.Cancelled,
-        ];
-        if (_.includes(toSendMail, data?.status)) {
-          mailHelper.send(
-            user.email,
-            `Checkout the new remarks`,
-            "updateQuoteRemark",
-            combinedUserQuote
-          );
-        }
-        if (data.status !== quote.status) {
-          const toSendMail = [
-            c.quoteStatus.Submitted,
-            c.quoteStatus.Completed,
-            c.quoteStatus.Cancelled,
-          ];
-
-          if (_.includes(toSendMail, data?.status)) {
-            // console.log("step final");
-            mailHelper.sent(
-              user.email,
-              `Quotes status changed to ${data?.status}`,
-              "updateQuoteStatus",
-              combinedUserQuote
-            );
-          }
-        }
-      }
-    } catch (error) {
-      console.log("update quote mail error", error);
-    }
-  },
-  updateQuoteItemMail: async (id, data) => {
-    let quoteItem = await QuoteItem.findOne({
-      where: {
-        $or: [
-          id?.toString()?.length < 11
-            ? {
-              id: id,
-            }
-            : {
-              guid: id,
-            },
-        ],
-      },
-    });
-    if (quoteItem?.userId) {
-      const user = await userHelper.getUser(quoteItem?.userId);
-      const combinedUserQuote = _.merge(user, quoteItem);
-      if (data.remark != quoteItem.remark) {
-        mailHelper.sent(
-          user.email,
-          `Checkout the new remarks`,
-          "updateQuoteRemark",
-          combinedUserQuote
-        );
-      }
-      if (data.status !== quoteItem.status) {
-        const toSendMail = [
-          c.quoteStatus.Submitted,
-          c.quoteStatus.Completed,
-          c.quoteStatus.Cancelled,
-        ];
-        if (_.includes(toSendMail, data?.status)) {
-          await mailHelper.sent(
-            user.email,
-            `Quotes item status changed to ${data?.status}`,
-            "updateQuoteStatus",
-            quote
-          );
-        }
-      }
+      console.log("send insights mail error", err);
     }
   },
 
-  onBoardingEmail: async (id) => {
-    let user = await userHelper.getUser(id);
-
-    console.log("onboarding email data", _.merge(config, user));
-    let response = mailHelper.sent(
-      user.email,
-      `🎉 Welcome to ${config.siteName} 🌿`,
-      "signup",
-      _.merge(config, user.dataValues)
-    );
-    return response;
-  },
-  sendN8nEmail: async (to, bcc, cc, subject, body) => {
-    try {
-      const options = {
-        to,
-        bcc,
-        cc,
-        subject,
-        body
-      }
-      const response = await mailHelper.sent(
-        to,
-        subject,
-        "n8n",
-        { body: body },
-        options
-      );
-
-      console.log("response from email", response);
-      const responseData = {
-        data: response,
-        status: "success"
-      }
-      return responseData;
-    } catch (error) {
-      throw error;
-    }
-
-  }
 };
 
 module.exports = mailHelper;

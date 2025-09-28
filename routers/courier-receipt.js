@@ -25,4 +25,10 @@ router.get("/project/:projectId", authenticateToken, courierReceiptController.ge
 // Get courier receipts by group
 router.get("/group/:groupId", authenticateToken, courierReceiptController.getByGroup);
 
+// Analyze courier receipt
+router.post("/analyze/:projectId", authenticateToken, courierReceiptController.analyze);
+
+// Get courier receipt analysis results
+router.get("/analysis/:projectId", authenticateToken, courierReceiptController.getAnalysis);
+
 module.exports = router;

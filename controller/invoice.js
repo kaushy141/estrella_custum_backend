@@ -422,7 +422,6 @@ const controller = {
   translate: async function (req, res) {
     try {
       const { id } = req.params;
-      const { language } = req.body;
 
       const project = await Project.findOne({ where: { guid: id } });
       if (!project) {
@@ -435,7 +434,7 @@ const controller = {
       }
       await Invoice.update(
         {
-          translatedLanguage: language,
+          translatedLanguage: project.translatedLanguage,
         },
         { where: { projectId: project.id } }
       );
@@ -452,40 +451,28 @@ const controller = {
           }
         );
 
-        //create payload of saved originalFile 
+
+        // Create thread ID if it doesn't exist
+        let threadId = project.aiConversation;
+        if (!threadId) {
+          threadId = await openAIHelper.createConversationId();
+          // Update project with new thread ID
+          await project.update({ aiConversation: threadId });
+        }
 
         // Start translation in background
         const translationPromise = openAIHelper.translateInvoice({
           id: invoice.id,
-          filePath: invoice.originalFilePath,
-          fileName: invoice.originalFileName,
+          originalFilePath: invoice.originalFilePath,
+          originalFileName: invoice.originalFileName,
           language: project.language,
           translatedLanguage: project.translatedLanguage,
           currency: project.currency,
           exchangeCurrency: project.exchangeCurrency,
           exchangeRate: project.exchangeRate,
-        },
-          project.aiConversation
-        );
+        }, threadId);
 
 
-        // call the translate api
-        // const translatedInvoice = await translateDocument({
-        //   taskId: "Invoice",
-        //   filePath: invoice.originalFilePath,
-        //   fileName: invoice.originalFileName,
-        //   language: language,
-        // });
-        // await invoice.update(
-        //   {
-        //     translatedFilePath: translatedInvoice.translatedFilePath,
-        //     translatedFileName: translatedInvoice?.originalFileName || null,
-        //     status: "completed",
-        //   },
-        //   {
-        //     where: { id: invoice.id },
-        //   }
-        // );
       }
       return sendResponseWithData(
         res,

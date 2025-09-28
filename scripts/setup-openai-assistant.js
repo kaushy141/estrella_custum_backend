@@ -3,61 +3,15 @@
  * This script creates an OpenAI Assistant specifically for invoice translation tasks
  */
 
-const OpenAI = require('openai');
+const openAIService = require('../services/openai-service');
 require('dotenv').config();
-
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
 
 async function createInvoiceTranslationAssistant() {
     try {
         console.log('Creating OpenAI Assistant for Invoice Translation...');
 
-        const assistant = await openai.beta.assistants.create({
-            name: "Invoice Translation Assistant",
-            description: "Professional assistant for translating invoices and comparing mismatches between original and translated invoices or between invoice and customs clearance documents.",
-            model: "gpt-3.5-turbo",
-            instructions: `You are a professional invoice translation assistant with expertise in:
-
-1. **Invoice Translation**: Translate invoice data while maintaining original structure and formatting
-2. **Currency Conversion**: Convert currency values to specified format while preserving numerical accuracy
-3. **Document Comparison**: Compare information between original and translated invoices
-4. **Customs Clearance**: Compare invoice data with customs clearance documents
-5. **Mismatch Detection**: Identify discrepancies between different documents
-
-**Key Responsibilities:**
-- Preserve all numerical data, dates, and business information accurately
-- Maintain professional formatting and structure
-- Ensure currency values are properly converted
-- Highlight any discrepancies or mismatches found
-- Provide clear, professional translations suitable for business use
-
-**Translation Guidelines:**
-- Keep technical terms and business terminology accurate
-- Maintain invoice numbering and reference formats
-- Preserve tax calculations and financial data
-- Use appropriate business language for the target market
-- Ensure compliance with local business practices
-
-**Comparison Guidelines:**
-- Systematically compare each field between documents
-- Highlight discrepancies in amounts, dates, descriptions
-- Flag missing or additional information
-- Provide clear summary of differences found
-- Suggest resolution for identified mismatches
-
-Always provide professional, accurate, and detailed responses suitable for business documentation.`,
-            tools: [
-                {
-                    type: "code_interpreter"
-                }
-            ],
-            temperature: 0.3,
-            top_p: 1,
-            max_completion_tokens: 2000,
-            max_prompt_tokens: 4000
-        });
+        const assistantId = await openAIService.getAssistantId();
+        const assistant = await openAIService.getAssistant(assistantId);
 
         console.log('✅ Assistant created successfully!');
         console.log('Assistant ID:', assistant.id);
@@ -81,12 +35,12 @@ Always provide professional, accurate, and detailed responses suitable for busin
 async function listExistingAssistants() {
     try {
         console.log('📋 Existing Assistants:');
-        const assistants = await openai.beta.assistants.list();
+        const assistants = await openAIService.listAssistants();
 
-        if (assistants.data.length === 0) {
+        if (assistants.length === 0) {
             console.log('No assistants found.');
         } else {
-            assistants.data.forEach((assistant, index) => {
+            assistants.forEach((assistant, index) => {
                 console.log(`${index + 1}. ${assistant.name} (${assistant.id})`);
                 console.log(`   Model: ${assistant.model}`);
                 console.log(`   Created: ${new Date(assistant.created_at * 1000).toLocaleDateString()}`);
@@ -94,7 +48,7 @@ async function listExistingAssistants() {
             });
         }
 
-        return assistants.data;
+        return assistants;
     } catch (error) {
         console.error('❌ Error listing assistants:', error);
         throw error;

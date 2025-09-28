@@ -1,21 +1,13 @@
-const OpenAI = require('openai');
 const crypto = require('crypto');
 const moment = require('moment');
 const fs = require('fs').promises;
 const path = require('path');
 const { Invoice } = require('../models/invoice-model');
+const openAIService = require('../services/openai-service');
+const invoiceTemplateService = require('../services/invoice-template-service');
 
 class OpenAIHelper {
     constructor() {
-        this.openai = new OpenAI({
-            apiKey: process.env.OPENAI_API_KEY || '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',
-        });
-
-        // Default model configuration for translation
-        this.defaultModel = 'gpt-5-2025-08-07';
-        this.defaultMaxTokens = 2000;
-        this.defaultTemperature = 0.3;
-
         // Translation output directory
         this.translationDir = path.join(__dirname, '../media/invoices/translations');
         this.ensureTranslationDirectory();
@@ -38,17 +30,7 @@ class OpenAIHelper {
      * @returns {Promise<string>} - OpenAI thread ID
      */
     async createConversationId() {
-        try {
-            // Create a new thread using OpenAI API
-            const thread = await this.openai.beta.threads.create();
-            const threadId = thread.id;
-
-            console.log(`New OpenAI thread created: ${threadId}`);
-            return threadId;
-        } catch (error) {
-            console.error('Error creating OpenAI thread:', error);
-            throw new Error(`Failed to create OpenAI thread: ${error.message}`);
-        }
+        return await openAIService.createThread();
     }
 
     /**
@@ -62,30 +44,77 @@ class OpenAIHelper {
     async translateInvoice(invoiceData, threadId) {
         return new Promise(async (resolve, reject) => {
             try {
-                let attachments = [];
-                console.log(`Starting translation for thread ${threadId}...`);
-                const originalFileContent = null;
-                if (invoiceData.originalFilePath) {
-                    originalFileContent = await fs.readFile(invoiceData.originalFilePath, 'utf8');
-                    invoiceData.originalFileContent = originalFileContent;
-                    const contentType = invoiceData.originalFileName.split('.').pop();
+                // Validate threadId
+                if (!threadId || typeof threadId !== 'string') {
+                    throw new Error(`Invalid threadId: ${threadId}. Expected a valid string.`);
+                }
 
-                    //add this file in openAI thread
-                    const uploadedFile = await this.openai.beta.threads.files.create(threadId, {
-                        file: {
-                            file_id: invoiceData.originalFilePath,
-                            filename: invoiceData.originalFileName,
-                            purpose: 'assistants',
-                            content_type: `application/${contentType}`,
-                        },
-                        purpose: 'assistants'
-                    });
-                    attachments.push({
-                        "file_id": uploadedFile.id,
-                        "file_purpose": "assistants",
-                        "type": `input_file`,
-                        "tools": [{ "type": "file_search" }, { "type": "code_interpreter" }]
-                    })
+                let attachments = [];
+                let originalFileContent = null;
+                console.log(`Starting translation for thread ${threadId}...`);
+                console.log(`invoiceData: `, invoiceData);
+
+                if (invoiceData.originalFilePath) {
+                    // Read the file content
+                    const fullFilePath = path.join(__dirname, '..', invoiceData.originalFilePath);
+                    console.log(`Reading file from: ${fullFilePath}`);
+
+                    try {
+                        const fileExtension = invoiceData.originalFileName.split('.').pop().toLowerCase();
+
+                        // Handle different file types
+                        if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+                            // For Excel files, convert to CSV for better processing
+                            try {
+                                const XLSX = require('xlsx');
+                                const workbook = XLSX.readFile(fullFilePath);
+                                const sheetName = workbook.SheetNames[0];
+                                const worksheet = workbook.Sheets[sheetName];
+                                originalFileContent = XLSX.utils.sheet_to_csv(worksheet);
+                                console.log(`Excel converted to CSV, content length: ${originalFileContent.length} characters`);
+                            } catch (excelError) {
+                                console.log('Could not convert Excel, reading as text:', excelError.message);
+                                originalFileContent = await fs.readFile(fullFilePath, 'utf8');
+                            }
+                        } else {
+                            originalFileContent = await fs.readFile(fullFilePath, 'utf8');
+                        }
+
+                        console.log(`File content length: ${originalFileContent.length} characters`);
+
+                        // Try to upload file if it's not too large
+                        try {
+                            const tempFilePath = path.join(__dirname, '../temp', `temp_${Date.now()}_${invoiceData.originalFileName}`);
+                            await fs.mkdir(path.dirname(tempFilePath), { recursive: true });
+                            await fs.writeFile(tempFilePath, originalFileContent, 'utf8');
+
+                            const uploadedFile = await openAIService.uploadFile(tempFilePath, invoiceData.originalFileName);
+
+                            attachments.push({
+                                "file_id": uploadedFile.id,
+                                "tools": [{ "type": "file_search" }]
+                            });
+
+                            console.log(`File uploaded to OpenAI with ID: ${uploadedFile.id}`);
+
+                            // Clean up temp file
+                            await fs.unlink(tempFilePath);
+
+                        } catch (uploadError) {
+                            console.log(`File upload failed (${uploadError.message}), using content directly in prompt`);
+                            // Continue without file attachment - content will be in the prompt 
+                            Invoice.update(
+                                {
+                                    insights: uploadError.message,
+                                },
+                                { where: { id: invoiceData.id } }
+                            );
+                        }
+
+                    } catch (fileError) {
+                        console.error(`Error reading file ${fullFilePath}:`, fileError);
+                        throw new Error(`Failed to read file: ${fileError.message}`);
+                    }
                 }
 
                 // Prepare the translation prompt
@@ -93,9 +122,9 @@ class OpenAIHelper {
 from Excel invoice files, translates field labels, and applies currency conversion.
 Return a valid JSON object only`;
 
-                const userPrompt = `You are given the invoice data below (pandas table):
+                const userPrompt = `You are given the invoice data below:
 
-${originalFileContent.slice(0, 50)}
+${originalFileContent ? originalFileContent.slice(0, 1000) : 'No file content available'}
 
 Your task is to extract the following key fields and output them in JSON:
 
@@ -181,35 +210,51 @@ with structure like this:
 `;
 
 
-                // Add message to the thread
-                await this.openai.beta.threads.messages.create(threadId, {
-                    role: 'user',
-                    content: userPrompt
-                });
+                // Add message to the thread with attachments
+                await openAIService.addMessageToThread(threadId, userPrompt, attachments);
 
                 // Create a run to process the message
-                const run = await this.openai.beta.threads.runs.create(threadId, {
-                    assistant_id: process.env.OPENAI_ASSISTANT_ID || 'asst_default', // You'll need to create an assistant
-                    instructions: systemPrompt,
-                    attachments: attachments
-                });
+                const run = await openAIService.createRun(threadId, systemPrompt);
 
                 // Wait for the run to complete
-                let runStatus = await this.openai.beta.threads.runs.retrieve(threadId, run.id);
-                while (runStatus.status === 'queued' || runStatus.status === 'in_progress') {
-                    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
-                    runStatus = await this.openai.beta.threads.runs.retrieve(threadId, run.id);
-                }
+                const runStatus = await openAIService.waitForRunCompletion(threadId, run.id);
 
                 if (runStatus.status === 'completed') {
                     // Get the assistant's response
-                    const messages = await this.openai.beta.threads.messages.list(threadId);
-                    const translatedContent = messages.data[0].content[0].text.value;
+                    const messages = await openAIService.getThreadMessages(threadId);
+                    const translatedContent = messages[0].content[0].text.value;
+                    console.log(`Translation content length: ${translatedContent.length} characters`);
 
-                    // Generate filename with timestamp
-                    const timestamp = moment().format('YYYYMMDD_HHmmss');
-                    const filename = `translated_invoice_${threadId}_${timestamp}.json`;
-                    const filePath = path.join(this.translationDir, filename);
+                    // Parse the translated content as JSON
+                    let translatedData;
+                    try {
+                        translatedData = JSON.parse(translatedContent);
+                        console.log('Successfully parsed translated content as JSON');
+                    } catch (parseError) {
+                        console.log('Could not parse as JSON, treating as raw text:', parseError.message);
+                        translatedData = {
+                            raw_content: translatedContent,
+                            parsed: false
+                        };
+                    }
+
+                    // Generate file with same extension as original
+                    const fileInfo = await invoiceTemplateService.generateInvoiceFile(
+                        translatedData,
+                        invoiceData.originalFileName,
+                        invoiceData.originalFilePath,
+                        this.translationDir,
+                        {
+                            currencyConversion: {
+                                exchangeRate: invoiceData.exchangeRate || 1,
+                                sourceCurrency: invoiceData.currency || 'USD',
+                                targetCurrency: invoiceData.exchangeCurrency || 'USD'
+                            },
+                            targetLanguage: invoiceData.translatedLanguage || 'Polish'
+                        }
+                    );
+
+                    console.log(`Translation file generated: ${fileInfo.filePath}`);
 
                     // Prepare the output data
                     const outputData = {
@@ -220,20 +265,20 @@ with structure like this:
                         currency: invoiceData.currency,
                         translatedAt: moment().toISOString(),
                         originalData: invoiceData,
-                        translatedData: translatedContent,
-                        usage: runStatus.usage
+                        translatedData: translatedData,
+                        usage: runStatus.usage,
+                        generatedFile: fileInfo
                     };
 
-                    // Save to filesystem
-                    await fs.writeFile(filePath, JSON.stringify(outputData, null, 2), 'utf8');
-
-                    console.log(`Translation completed and saved: ${filePath}`);
+                    // Save metadata as JSON
+                    const metadataPath = path.join(this.translationDir, `metadata_${threadId}_${moment().format('YYYYMMDD_HHmmss')}.json`);
+                    await fs.writeFile(metadataPath, JSON.stringify(outputData, null, 2), 'utf8');
 
                     await Invoice.update(
                         {
-                            translatedFileContent: translatedContent,
-                            translatedFilePath: filePath,
-                            translatedFileName: filename,
+                            translatedFileContent: JSON.stringify(translatedData),
+                            translatedFilePath: fileInfo.filePath,
+                            translatedFileName: fileInfo.fileName,
                             status: "completed",
                         },
                         { where: { id: invoiceData.id } }
@@ -243,7 +288,9 @@ with structure like this:
                         success: true,
                         threadId: threadId,
                         runId: run.id,
-                        filePath: filePath,
+                        filePath: fileInfo.filePath,
+                        fileName: fileInfo.fileName,
+                        metadataPath: metadataPath,
                         translatedAt: outputData.translatedAt,
                         usage: runStatus.usage
                     });
@@ -253,6 +300,19 @@ with structure like this:
 
             } catch (error) {
                 console.error(`Error in translation for thread ${threadId}:`, error);
+
+                // Update invoice status to failed
+                try {
+                    await Invoice.update(
+                        {
+                            status: "failed",
+                        },
+                        { where: { id: invoiceData.id } }
+                    );
+                } catch (updateError) {
+                    console.error('Failed to update invoice status:', updateError);
+                }
+
                 reject({
                     success: false,
                     threadId: threadId,
@@ -262,6 +322,154 @@ with structure like this:
             }
         });
     }
+
+    async analyzeShippingService(project, shippingService) {
+
+        return new Promise(async (resolve, reject) => {
+            try {
+                const threadId = project.aiConversation;
+                const shippingServiceDocument = shippingService.document;
+
+                resolve(aiResponse);
+            } catch (error) {
+                console.error(`Error analyzing shipping service: ${error}`);
+                reject(error);
+            }
+        });
+    }
+
+    async analyzeCourierReceiptDocument(project, courierReceipt) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                console.log(`Starting courier receipt analysis for project ${project.id}...`);
+
+                const threadId = project.aiConversation;
+                const courierReceiptDocument = courierReceipt.filePath;
+                const courierReceiptFileName = courierReceipt.fileName;
+
+                // Upload the courier receipt file to OpenAI
+                const courierReceiptDocumentFile = await openAIService.uploadFile(courierReceiptDocument, courierReceiptFileName);
+                console.log(`Courier receipt file uploaded with ID: ${courierReceiptDocumentFile.id}`);
+
+                // Analyze the courier receipt document against invoice files
+                const aiResponse = await openAIService.analyzeCourierReceiptDocument(project, courierReceiptDocumentFile, threadId);
+
+                console.log(`Analysis completed successfully for courier receipt: ${courierReceiptFileName}`);
+
+                // Update courier receipt with insights
+                if (aiResponse.success && aiResponse.analysisData) {
+                    const { CourierReceipt } = require('../models/courier-receipt-model');
+
+                    await CourierReceipt.update(
+                        {
+                            insights: JSON.stringify(aiResponse.analysisData),
+                            status: "completed"
+                        },
+                        { where: { id: courierReceipt.id } }
+                    );
+
+                    console.log(`Courier receipt ${courierReceipt.id} updated with insights`);
+                }
+
+                resolve(aiResponse);
+            } catch (error) {
+                console.error(`Error analyzing courier receipt document: ${error}`);
+
+                // Update courier receipt status to failed
+                try {
+                    const { CourierReceipt } = require('../models/courier-receipt-model');
+                    await CourierReceipt.update(
+                        {
+                            status: "failed",
+                            insights: JSON.stringify({ error: error.message })
+                        },
+                        { where: { id: courierReceipt.id } }
+                    );
+                } catch (updateError) {
+                    console.error('Failed to update courier receipt status:', updateError);
+                }
+
+                reject(error);
+            }
+        });
+    }
+
+    /**
+     * Analyze custom declaration document with comprehensive invoice comparison
+     * This method performs deep analysis comparing custom declaration with existing files in thread
+     * Uses already uploaded files from threadId for reference, only uploads latest custom declaration
+     * @param {Object} project - Project object
+     * @param {Object} customDeclaration - Custom declaration object
+     * @param {Array} invoices - Array of invoice objects for context (not uploaded again)
+     * @returns {Promise} - Analysis results
+     */
+    async analyzeCustomDeclarationDocument(project, customDeclaration, invoices) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                console.log(`Starting comprehensive custom declaration analysis for project ${project.id}...`);
+                console.log(`Using existing files from thread, analyzing ${invoices.length} invoices against custom declaration...`);
+
+                const threadId = project.aiConversation;
+                const customDeclarationDocument = customDeclaration.filePath;
+                const customDeclarationFileName = customDeclaration.fileName;
+
+                // Upload only the custom declaration file to OpenAI
+                const customDeclarationDocumentFile = await openAIService.uploadFile(customDeclarationDocument, customDeclarationFileName);
+                console.log(`Custom declaration file uploaded with ID: ${customDeclarationDocumentFile.id}`);
+
+                // Use existing files from thread instead of re-uploading invoices
+                console.log(`Using existing files from thread: ${threadId}`);
+                console.log(`Invoice context: ${invoices.length} invoices available for reference`);
+
+                // Perform comprehensive analysis using existing thread files
+                const aiResponse = await openAIService.analyzeCustomDeclarationDocumentWithExistingFiles(
+                    project,
+                    customDeclarationDocumentFile,
+                    invoices,
+                    threadId
+                );
+
+                console.log(`Comprehensive analysis completed successfully for custom declaration: ${customDeclarationFileName}`);
+
+                // Update custom declaration with insights
+                if (aiResponse.success && aiResponse.analysisData) {
+                    const { CustomDeclaration } = require('../models/custom-declaration-model');
+
+                    await CustomDeclaration.update(
+                        {
+                            insights: JSON.stringify(aiResponse.analysisData),
+                            status: "completed"
+                        },
+                        { where: { id: customDeclaration.id } }
+                    );
+
+                    console.log(`Custom declaration ${customDeclaration.id} updated with comprehensive insights`);
+                }
+
+                resolve(aiResponse);
+            } catch (error) {
+                console.error(`Error analyzing custom declaration document: ${error}`);
+
+                // Update custom declaration status to failed
+                try {
+                    const { CustomDeclaration } = require('../models/custom-declaration-model');
+                    await CustomDeclaration.update(
+                        {
+                            status: "failed",
+                            insights: JSON.stringify({ error: error.message })
+                        },
+                        { where: { id: customDeclaration.id } }
+                    );
+                } catch (updateError) {
+                    console.error('Failed to update custom declaration status:', updateError);
+                }
+
+                reject(error);
+            }
+        });
+    }
+
+
 }
 
 // Create and export singleton instance

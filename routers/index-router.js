@@ -15,6 +15,8 @@ const courierReceiptRouter = require("./courier-receipt");
 const groupAddressRouter = require("./group-address");
 const activityLogRouter = require("./activity-log");
 const aiWebhookRouter = require("./ai-webhook");
+const insightRouter = require("./insight");
+const statsRouter = require("./stats");
 
 // Mount all routes
 router.use("/auth", authRouter);
@@ -30,5 +32,7 @@ router.use("/courier-receipt", courierReceiptRouter);
 router.use("/group-address", groupAddressRouter);
 router.use("/activity-log", activityLogRouter);
 router.use("/ai-webhook", aiWebhookRouter);
+router.use("/insight", insightRouter);
+router.use("/stats", statsRouter);
 
 module.exports = router;

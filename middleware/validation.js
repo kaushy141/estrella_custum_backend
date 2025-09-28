@@ -79,6 +79,229 @@ const isValidName = function (value) {
 //   }
 // };
 
+// Validation middleware for project insights email endpoint
+const validateProjectInsights = function (req, res, next) {
+  try {
+    const { projectId, subject } = req.body;
+
+    if (!isValidBody(req.body)) {
+      return res.status(400).json({
+        status: false,
+        message: "Request body cannot be empty",
+      });
+    }
+
+    if (!projectId) {
+      return res.status(400).json({
+        status: false,
+        message: "projectId is required",
+      });
+    }
+
+    // Subject is optional - will be generated if not provided
+    if (subject && !isValid(subject)) {
+      return res.status(400).json({
+        status: false,
+        message: "subject cannot be empty if provided",
+      });
+    }
+
+    next();
+  } catch (error) {
+    return res.status(500).json({
+      status: false,
+      message: "Validation error: " + error.message,
+    });
+  }
+};
+
+// Validation middleware for custom declaration insights email endpoint
+const validateCustomDeclarationInsights = function (req, res, next) {
+  try {
+    const { projectId, subject } = req.body;
+
+    if (!isValidBody(req.body)) {
+      return res.status(400).json({
+        status: false,
+        message: "Request body cannot be empty",
+      });
+    }
+
+    if (!projectId) {
+      return res.status(400).json({
+        status: false,
+        message: "projectId is required",
+      });
+    }
+
+    // Subject is optional - will be generated if not provided
+    if (subject && !isValid(subject)) {
+      return res.status(400).json({
+        status: false,
+        message: "subject cannot be empty if provided",
+      });
+    }
+
+    next();
+  } catch (error) {
+    return res.status(500).json({
+      status: false,
+      message: "Validation error: " + error.message,
+    });
+  }
+};
+
+// Validation middleware for combined insights email endpoint
+const validateCombinedInsights = function (req, res, next) {
+  try {
+    const { projectId, invoiceSubject, customDeclarationSubject } = req.body;
+
+    if (!isValidBody(req.body)) {
+      return res.status(400).json({
+        status: false,
+        message: "Request body cannot be empty",
+      });
+    }
+
+    if (!projectId) {
+      return res.status(400).json({
+        status: false,
+        message: "projectId is required",
+      });
+    }
+
+    // Subjects are optional - will be generated if not provided
+    if (invoiceSubject && !isValid(invoiceSubject)) {
+      return res.status(400).json({
+        status: false,
+        message: "invoiceSubject cannot be empty if provided",
+      });
+    }
+
+    if (customDeclarationSubject && !isValid(customDeclarationSubject)) {
+      return res.status(400).json({
+        status: false,
+        message: "customDeclarationSubject cannot be empty if provided",
+      });
+    }
+
+    next();
+  } catch (error) {
+    return res.status(500).json({
+      status: false,
+      message: "Validation error: " + error.message,
+    });
+  }
+};
+
+// Validation middleware for custom declaration insights to agents endpoint
+const validateCustomDeclarationInsightsToAgents = function (req, res, next) {
+  try {
+    const { projectId, subject } = req.body;
+
+    if (!isValidBody(req.body)) {
+      return res.status(400).json({
+        status: false,
+        message: "Request body cannot be empty",
+      });
+    }
+
+    if (!projectId) {
+      return res.status(400).json({
+        status: false,
+        message: "projectId is required",
+      });
+    }
+
+    // Subject is optional - will be generated if not provided
+    if (subject && !isValid(subject)) {
+      return res.status(400).json({
+        status: false,
+        message: "subject cannot be empty if provided",
+      });
+    }
+
+    next();
+  } catch (error) {
+    return res.status(500).json({
+      status: false,
+      message: "Validation error: " + error.message,
+    });
+  }
+};
+
+// Validation middleware for custom declaration insights to shipping services endpoint
+const validateCustomDeclarationInsightsToShippingServices = function (req, res, next) {
+  try {
+    const { projectId, subject } = req.body;
+
+    if (!isValidBody(req.body)) {
+      return res.status(400).json({
+        status: false,
+        message: "Request body cannot be empty",
+      });
+    }
+
+    if (!projectId) {
+      return res.status(400).json({
+        status: false,
+        message: "projectId is required",
+      });
+    }
+
+    // Subject is optional - will be generated if not provided
+    if (subject && !isValid(subject)) {
+      return res.status(400).json({
+        status: false,
+        message: "subject cannot be empty if provided",
+      });
+    }
+
+    next();
+  } catch (error) {
+    return res.status(500).json({
+      status: false,
+      message: "Validation error: " + error.message,
+    });
+  }
+};
+
+// Validation middleware for courier receipt insights to shipping services endpoint
+const validateCourierReceiptInsightsToShippingServices = function (req, res, next) {
+  try {
+    const { projectId, subject } = req.body;
+
+    if (!isValidBody(req.body)) {
+      return res.status(400).json({
+        status: false,
+        message: "Request body cannot be empty",
+      });
+    }
+
+    if (!projectId) {
+      return res.status(400).json({
+        status: false,
+        message: "projectId is required",
+      });
+    }
+
+    // Subject is optional - will be generated if not provided
+    if (subject && !isValid(subject)) {
+      return res.status(400).json({
+        status: false,
+        message: "subject cannot be empty if provided",
+      });
+    }
+
+    next();
+  } catch (error) {
+    return res.status(500).json({
+      status: false,
+      message: "Validation error: " + error.message,
+    });
+  }
+};
+
 module.exports = {
   isValid,
   isValidBody,
@@ -87,4 +310,10 @@ module.exports = {
   isValidNumber,
   isValidName,
   // validContactUs,
+  validateProjectInsights,
+  validateCustomDeclarationInsights,
+  validateCombinedInsights,
+  validateCustomDeclarationInsightsToAgents,
+  validateCustomDeclarationInsightsToShippingServices,
+  validateCourierReceiptInsightsToShippingServices,
 };

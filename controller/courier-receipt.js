@@ -6,6 +6,7 @@ const { SuccessCode, ErrorCode } = require("../helper/statusCode");
 const { Op } = require("sequelize");
 const activityHelper = require("../helper/activityHelper");
 const _ = require("lodash");
+const openAIHelper = require("../helper/openai-helper");
 const controller = {
   // Create new courier receipt
   create: async function (req, res) {
@@ -97,7 +98,7 @@ const controller = {
           null
         );
       }
-     
+
       let whereClause = {};
       if (projectId) whereClause.projectId = project.id;
       whereClause.groupId = groupId;
@@ -403,6 +404,164 @@ const controller = {
       );
     }
   },
+
+  // Analyze courier receipt document
+  analyze: async function (req, res) {
+    try {
+      const { projectId } = req.params;
+      const project = await Project.findOne({ where: { id: projectId } });
+      if (!project) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Project not found",
+          null
+        );
+      }
+
+      const courierReceipt = await CourierReceipt.findOne({
+        where: { projectId: projectId },
+        order: [['createdAt', 'DESC']]
+      });
+
+      if (!courierReceipt) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Courier receipt not found for this project",
+          null
+        );
+      }
+
+      // Check if courier receipt has required file
+      if (!courierReceipt.filePath || !courierReceipt.fileName) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.BAD_REQUEST,
+          "Courier receipt file is missing",
+          null
+        );
+      }
+
+      // Get or create AI conversation thread
+      let threadId = project.aiConversation;
+      if (!threadId) {
+        threadId = await openAIHelper.createConversationId();
+        // Update project with new thread ID
+        await project.update({ aiConversation: threadId });
+      }
+
+      // Update courier receipt status to processing
+      await courierReceipt.update({ status: "processing" });
+
+      // Start analysis in background
+      const analysisPromise = openAIHelper.analyzeCourierReceiptDocument(project, courierReceipt);
+
+      // Handle the promise to avoid unhandled promise rejection
+      analysisPromise
+        .then((result) => {
+          console.log(`Courier receipt analysis completed for project ${projectId}:`, result);
+        })
+        .catch((error) => {
+          console.error(`Courier receipt analysis failed for project ${projectId}:`, error);
+        });
+
+      return sendResponseWithData(
+        res,
+        SuccessCode.SUCCESS,
+        "Courier receipt analysis started successfully",
+        {
+          status: "processing",
+          projectId: projectId,
+          courierReceiptId: courierReceipt.id,
+          threadId: threadId,
+          message: "Analysis is running in the background. Check the courier receipt status for updates."
+        }
+      );
+
+    } catch (err) {
+      console.error("Courier receipt analysis failed:", err);
+      return sendResponseWithData(
+        res,
+        ErrorCode.REQUEST_FAILED,
+        "Unable to start courier receipt analysis",
+        err
+      );
+    }
+  },
+
+  // Get courier receipt analysis results
+  getAnalysis: async function (req, res) {
+    try {
+      const { projectId } = req.params;
+      const project = await Project.findOne({ where: { id: projectId } });
+      if (!project) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Project not found",
+          null
+        );
+      }
+
+      const courierReceipt = await CourierReceipt.findOne({
+        where: { projectId: projectId },
+        order: [['createdAt', 'DESC']]
+      });
+
+      if (!courierReceipt) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Courier receipt not found for this project",
+          null
+        );
+      }
+
+      let analysisData = null;
+      if (courierReceipt.insights) {
+        try {
+          analysisData = JSON.parse(courierReceipt.insights);
+        } catch (parseError) {
+          console.error('Error parsing courier receipt insights:', parseError);
+          analysisData = { error: 'Failed to parse analysis data' };
+        }
+      }
+
+      return sendResponseWithData(
+        res,
+        SuccessCode.SUCCESS,
+        "Courier receipt analysis retrieved successfully",
+        {
+          status: "success",
+          data: {
+            courierReceipt: {
+              id: courierReceipt.id,
+              fileName: courierReceipt.fileName,
+              status: courierReceipt.status,
+              createdAt: courierReceipt.createdAt,
+              updatedAt: courierReceipt.updatedAt
+            },
+            analysis: analysisData,
+            project: {
+              id: project.id,
+              title: project.title,
+              aiConversation: project.aiConversation
+            }
+          }
+        }
+      );
+
+    } catch (err) {
+      console.error("Get courier receipt analysis failed:", err);
+      return sendResponseWithData(
+        res,
+        ErrorCode.REQUEST_FAILED,
+        "Unable to get courier receipt analysis",
+        err
+      );
+    }
+  }
 };
 
 module.exports = controller;

@@ -4,6 +4,8 @@ const { sendResponseWithData } = require("../helper/commonResponseHandler");
 const { SuccessCode, ErrorCode } = require("../helper/statusCode");
 const _ = require("lodash");
 const activityHelper = require("../helper/activityHelper");
+const { Project } = require("../models/project-model");
+const openAIHelper = require("../helper/openai-helper");
 const controller = {
   // Create new shipping service
   create: async function (req, res) {
@@ -52,7 +54,7 @@ const controller = {
   // Get all shipping services
   getAll: async function (req, res) {
     try {
-      const { page = 1, limit = 10,  isActive } = req.query;
+      const { page = 1, limit = 10, isActive } = req.query;
       const offset = (page - 1) * limit;
       let whereClause = {};
       const groupId = req.groupId;
@@ -364,7 +366,7 @@ const controller = {
         err
       );
     }
-  }
+  },
 };
 
 module.exports = controller;
