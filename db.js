@@ -29,12 +29,12 @@ const operatorsAliases = {
 //   dialect: process.env.DB_DIALECT || "mysql"
 // };
 const dbConfig = {
-  database:  "customs",
-  username:  "root",
-  password:  "Kaushal@123",
-  hostname:  "localhost",
-  port:  3306,
-  dialect:  "mysql"
+  database: "customs",
+  username: "root",
+  password: "Kaushal@123",
+  hostname: "localhost",
+  port: 3306,
+  dialect: "mysql"
 };
 
 const sequelize = new Sequelize(
