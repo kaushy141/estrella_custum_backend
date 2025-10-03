@@ -3,7 +3,7 @@ const moment = require('moment');
 const openAIService = require('../services/openai-service');
 const invoiceTemplateService = require('../services/invoice-template-service');
 const { Invoice } = require('../models/invoice-model');
-
+const { CourierReceipt } = require('../models/courier-receipt-model');
 class OpenAIHelper {
     /**
      * Create a new OpenAI conversation thread
@@ -352,6 +352,28 @@ Your response must be parseable JSON only.`;
             console.log(`Starting comprehensive courier receipt analysis for project ${project.id}...`);
 
             const threadId = project.aiConversation;
+            let uploadedFile = null;
+
+            // Upload the file directly without conversion
+            const fullFilePath = path.join(__dirname, '..', courierReceipt.filePath);
+            console.log(`Uploading file from: ${fullFilePath}`);
+
+            try {
+                uploadedFile = await openAIService.uploadFile(fullFilePath, courierReceipt.fileName);
+                await CourierReceipt.update({ openAIFileId: uploadedFile.id }, { where: { id: courierReceipt.id } });
+                //await Invoice.save();
+                console.log(`File uploaded to OpenAI with ID: ${uploadedFile.id}`);
+            } catch (uploadError) {
+                console.log(`File upload failed (${uploadError.message}), continuing without file attachment`);
+                // Continue without file attachment - will rely on prompt content
+                CourierReceipt.update(
+                    {
+                        insights: uploadError.message,
+                    },
+                    { where: { id: courierReceipt.id } }
+                );
+                uploadedFile = null;
+            }
 
             // Get all invoices for this project to include in analysis
             const { Invoice } = require('../models/invoice-model');
@@ -371,37 +393,141 @@ Your response must be parseable JSON only.`;
 
             console.log(`Comprehensive analysis completed successfully for courier receipt: ${courierReceipt.fileName}`);
 
-            // Update courier receipt with insights
+            // Update courier receipt with enhanced insights and verification
             if (aiResponse.success && aiResponse.analysisData) {
-                const { CourierReceipt } = require('../models/courier-receipt-model');
 
-                await CourierReceipt.update(
+
+                console.log(`Updating courier receipt ${courierReceipt.id} with comprehensive insights...`);
+                console.log('Analysis data structure:', {
+                    success: aiResponse.success,
+                    hasAnalysisData: !!aiResponse.analysisData,
+                    analysisType: aiResponse.analysisData?.analysisType,
+                    filesAnalyzed: aiResponse.filesAnalyzed,
+                    invoiceCount: aiResponse.invoiceCount,
+                    analyzedAt: aiResponse.analyzedAt
+                });
+
+                // Create comprehensive insights structure for courier receipt
+                const insightsData = {
+                    ...aiResponse.analysisData,
+                    metadata: {
+                        analysisType: "courier_receipt_comprehensive_analysis",
+                        courierReceiptId: courierReceipt.id,
+                        courierReceiptFileName: courierReceipt.fileName,
+                        projectId: project.id,
+                        projectTitle: project.title,
+                        filesAnalyzed: aiResponse.filesAnalyzed || 0,
+                        invoiceCount: aiResponse.invoiceCount || 0,
+                        analyzedAt: aiResponse.analyzedAt,
+                        generatedBy: "OpenAI Assistant with Content Data Analysis"
+                    }
+                };
+
+                const updateResult = await CourierReceipt.update(
                     {
-                        insights: JSON.stringify(aiResponse.analysisData),
+                        insights: JSON.stringify(insightsData),
                         status: "completed"
                     },
                     { where: { id: courierReceipt.id } }
                 );
 
-                console.log(`Courier receipt ${courierReceipt.id} updated with comprehensive insights`);
+                console.log(`Courier receipt ${courierReceipt.id} update result:`, updateResult);
+
+
+
+                // Verify the update by fetching the record
+                const updatedRecord = await CourierReceipt.findByPk(courierReceipt.id);
+                if (updatedRecord) {
+                    console.log(`✅ Verification: Courier receipt ${courierReceipt.id} updated successfully`);
+                    console.log(`✅ Verification: Status changed to: ${updatedRecord.status}`);
+                    console.log(`✅ Verification: Insights field length: ${updatedRecord.insights ? updatedRecord.insights.length : 'null'} characters`);
+
+                    if (updatedRecord.insights) {
+                        try {
+                            const parsedInsights = JSON.parse(updatedRecord.insights);
+                            console.log(`✅ Verification: Insights contain ${Object.keys(parsedInsights).length} main sections`);
+                            console.log(`✅ Verification: Analysis type: ${parsedInsights.analysisType || 'unknown'}`);
+                            console.log(`✅ Verification: Files analyzed: ${parsedInsights.metadata?.filesAnalyzed || 0}`);
+                            console.log(`✅ Verification: Invoice count: ${parsedInsights.metadata?.invoiceCount || 0}`);
+                        } catch (e) {
+                            console.log(`⚠️ Verification: Insights field exists but could not parse JSON: ${e.message}`);
+                        }
+                    }
+                } else {
+                    console.log(`❌ Verification failed: Could not fetch updated courier receipt ${courierReceipt.id}`);
+                }
+            } else {
+                console.log('AI Response conditions not met for courier receipt insights update:');
+                console.log('- success:', aiResponse.success);
+                console.log('- analysisData:', aiResponse.analysisData ? 'present' : 'missing');
+                console.log('- Full response structure:', {
+                    success: aiResponse.success,
+                    hasAnalysisData: !!aiResponse.analysisData,
+                    analyzedAt: aiResponse.analyzedAt,
+                    filesAnalyzed: aiResponse.filesAnalyzed,
+                    error: aiResponse.error
+                });
             }
 
             return aiResponse;
         } catch (error) {
             console.error(`Error analyzing courier receipt document: ${error}`);
 
-            // Update courier receipt status to failed
+            // Update courier receipt status to failed with detailed error insights 
             try {
-                const { CourierReceipt } = require('../models/courier-receipt-model');
-                await CourierReceipt.update(
+
+
+                const errorInsights = {
+                    success: false,
+                    error: {
+                        message: error.message,
+                        timestamp: new Date().toISOString(),
+                        courierReceiptId: courierReceipt.id,
+                        courierReceiptFileName: courierReceipt.fileName,
+                        projectId: project.id,
+                        projectTitle: project.title,
+                        stage: "courier_receipt_analysis_failed",
+                        possibleCauses: [
+                            "File upload to OpenAI failed",
+                            "OpenAI API service unavailable",
+                            "Analysis timeout or response parsing error",
+                            "File format not supported by OpenAI",
+                            "Network connectivity issues"
+                        ],
+                        nextSteps: [
+                            "Check courier receipt file format and size",
+                            "Verify OpenAI API configuration",
+                            "Retry analysis after resolving network issues",
+                            "Contact support if issue persists"
+                        ]
+                    },
+                    metadata: {
+                        analysisType: "courier_receipt_error_analysis",
+                        generatedBy: "OpenAI Error Handler"
+                    }
+                };
+
+                const updateResult = await CourierReceipt.update(
                     {
                         status: "failed",
-                        insights: JSON.stringify({ error: error.message })
+                        insights: JSON.stringify(errorInsights)
                     },
                     { where: { id: courierReceipt.id } }
                 );
+
+                console.log(`❌ Courier receipt ${courierReceipt.id} marked as failed`);
+                console.log(`❌ Update result:`, updateResult);
+
+                // Verify the error update
+                const updatedRecord = await CourierReceipt.findByPk(courierReceipt.id);
+                if (updatedRecord && updatedRecord.status === "failed") {
+                    console.log(`✅ Verification: Courier receipt ${courierReceipt.id} status updated to 'failed'`);
+                    console.log(`✅ Verification: Error insights stored successfully`);
+                }
+
             } catch (updateError) {
-                console.error('Failed to update courier receipt status:', updateError);
+                console.error('❌ Failed to update courier receipt status to failed:', updateError);
+                console.error('❌ This indicates a serious database connectivity issue');
             }
 
             throw error;
@@ -427,17 +553,19 @@ Your response must be parseable JSON only.`;
             const customDeclarationFileName = customDeclaration.fileName;
 
             // Upload only the custom declaration file to OpenAI
-            let customDeclarationDocumentFile;
+            let customDeclarationDocId;
 
             // Check if file already has an OpenAI file ID
             if (customDeclaration.openAIFileId) {
                 console.log(`Using existing OpenAI file ID: ${customDeclaration.openAIFileId}`);
-                customDeclarationDocumentFile = { id: customDeclaration.openAIFileId };
+                customDeclarationDocId = customDeclaration.openAIFileId;
             } else {
-                customDeclarationDocumentFile = await openAIService.uploadFile(customDeclarationDocument, customDeclarationFileName);
+                const customDeclarationDocumentFile = await openAIService.uploadFile(customDeclarationDocument, customDeclarationFileName);
                 console.log(`Custom declaration file uploaded with ID: ${customDeclarationDocumentFile.id}`);
                 await customDeclaration.update({ openAIFileId: customDeclarationDocumentFile.id });
                 await customDeclaration.save();
+                customDeclarationDocId = customDeclarationDocumentFile.id;
+
             }
 
             // Use existing files from thread instead of re-uploading invoices
@@ -447,7 +575,7 @@ Your response must be parseable JSON only.`;
             // Perform comprehensive analysis using existing thread files
             const aiResponse = await openAIService.analyzeCustomDeclarationDocumentWithExistingFiles(
                 project,
-                customDeclarationDocumentFile,
+                customDeclarationDocId,
                 invoices,
                 threadId
             );

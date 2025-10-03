@@ -810,6 +810,615 @@ Always provide professional, accurate, and detailed responses suitable for busin
         }
     }
 
+    /**
+     * Analyze custom declaration document with existing files and invoice content data
+     * @param {Object} project - Project object
+     * @param {Object} customDeclaration - Custom declaration object
+     * @param {Array} invoices - Array of invoice objects with content data
+     * @param {string} threadId - OpenAI thread ID
+     * @returns {Promise<Object>} - Analysis result object
+     */
+    async analyzeCustomDeclarationDocumentWithExistingFiles(project, customDeclarationId, invoices, threadId) {
+        try {
+            console.log(`Starting comprehensive custom declaration analysis with existing files for project ${project.id}...`);
+
+
+            // Prepare comprehensive analysis data
+            const analysisData = {
+                project: {
+                    id: project.id,
+                    title: project.title,
+                    description: project.description
+                },
+                customDeclaration: {
+                    id: customDeclarationId,
+                },
+                invoices: invoices.map(invoice => ({
+                    id: invoice.id,
+                    originalFileContent: invoice.originalFileContent,
+                    translatedFileContent: invoice.translatedFileContent
+                })),
+                analysisTimestamp: new Date().toISOString(),
+                invoiceCount: invoices.length
+            };
+
+            console.log(`Prepared analysis data for ${invoices.length} invoices and custom declaration`);
+
+            // Create comprehensive analysis instructions
+            const analysisInstructions = `You are analyzing a custom declaration (ZC document) against invoice data for comprehensive customs validation and accuracy verification.
+
+**Analysis Context:**
+- Project: ${project.title} (ID: ${project.id})
+- Invoice Count: ${invoices.length}
+- Analysis Type: Comprehensive customs declaration content-based comparison
+
+**Primary Objectives:**
+1. **Custom Declaration Analysis**: Extract customs declaration details, item classifications, values, and tariff codes
+2. **Invoice Cross-Reference**: Compare custom declaration data against ${invoices.length} invoice(s) for accuracy and compliance
+3. **Address Validation**: Cross-check billing addresses, shipping addresses, and consignee information
+4. **Item Verification**: Validate item counts, weights, dimensions, descriptions, and classifications
+5. **Value Validation**: Cross-reference total costs, unit prices, currency, and cost breakdowns
+6. **Compliance Check**: Ensure customs compliance, proper documentation, and regulatory adherence
+
+**Custom Declaration Focus Areas:**
+- Import/export declaration numbers and references
+- Origin and destination country codes and customs offices
+- Item classifications (HS codes, tariff classifications)
+- Declared values, quantities, weights, and measurements
+- Consignee and consignor information
+- Customs duties, taxes, and fees calculation
+- Document references and certifications
+- Shipping method and transport details
+
+**Critical Cross-Check Validations:**
+1. **Address Verification:**
+   - Billing address consistency between declaration and invoices
+   - Shipping/delivery address alignment
+   - Consignee information accuracy
+   - Geographic and postal code validation
+
+2. **Item Synchronization:**
+   - Item count and quantity consistency
+   - Weight and dimension validation
+   - Product descriptions and specifications matching
+   - Unit measurements and packaging details
+
+3. **Financial Validation:**
+   - Total cost alignment between declaration and invoices
+   - Currency consistency and exchange rates
+   - Unit price calculations and totals
+   - Tax calculations and duty assessments
+   - Discounts, fees, and surcharges breakdown
+
+4. **Compliance Verification:**
+   - HS code accuracy and classification validity
+   - Country of origin documentation
+   - Regulatory compliance and restrictions
+   - Required certifications and permits
+   - Trade agreement applicability
+
+**Response Format Requirements:**
+Provide a comprehensive JSON response with the following structure:
+{
+  "success": true,
+  "analysisType": "custom_declaration_comprehensive_validation",
+  "timestamp": "ISO_TIMESTAMP",
+  "projectInfo": {
+    "id": PROJECT_ID,
+    "title": "PROJECT_TITLE"
+  },
+  "customDeclarationAnalysis": {
+    "fileName": "FILENAME",
+    "declarationInfo": {
+      "declarationNumber": "Declaration reference number",
+      "declarationType": "Import/Export type",
+      "issueDate": "Declaration issue date",
+      "validUntil": "Declaration validity period",
+      "customsOffice": "Customs office details"
+    },
+    "originDestination": {
+      "originCountry": "Country of origin",
+      "originCity": "Origin city/port",
+      "destinationCountry": "Destination country",
+      "destinationCity": "Destination city/port",
+      "routeTransit": "Shipping route and transit points"
+    },
+    "partyInfo": {
+      "consignor": "Exporter/consignor information",
+      "consignee": "Importer/consignee information",
+      "shippingAgent": "Shipping agent details",
+      "customsBroker": "Customs broker information"
+    },
+    "items": [
+      {
+        "itemIndex": INDEX,
+        "description": "Product description",
+        "hsCode": "HS classification code",
+        "quantity": "Item quantity",
+        "unit": "Measurement unit",
+        "weight": "Gross/net weight",
+        "dimensions": "Package dimensions",
+        "value": "Declared value per unit",
+        "totalValue": "Total item value",
+        "originCountry": "Country of origin for item",
+        "purpose": "Intended use/purpose"
+      }
+    ],
+    "financialDetails": {
+      "totalValue": "Total declared value",
+      "currency": "Currency code",
+      "exchangeRate": "Exchange rate if applicable",
+      "duties": "Calculated duties",
+      "taxes": "Additional taxes",
+      "fees": "Customs fees",
+      "grandTotal": "Grand total amount"
+    }
+  },
+  "invoiceComparison": {
+    "matchedInvoices": [
+      {
+        "invoiceId": INVOICE_ID,
+        "fileName": "INVOICE_FILENAME",
+        "correlationScore": "Similarity percentage",
+        "addressValidation": {
+          "billingAddressMatch": true/false,
+          "shippingAddressMatch": true/false,
+          "consigneeMatch": true/false,
+          "addressDifferences": ["Specific differences"]
+        },
+        "itemValidation": {
+          "itemCountMatch": true/false,
+          "quantityVariance": "Percentage difference",
+          "weightVariance": "Weight difference",
+          "itemDifferences": ["Specific item discrepancies"]
+        },
+        "financialValidation": {
+          "totalCostVariance": "Cost difference percentage",
+          "currencyMatch": true/false,
+          "unitPriceDifferences": ["Unit price variations"],
+          "taxCalculationMatch": true/false
+        },
+        "matches": [
+          "Specific matching criteria"
+        ],
+        "discrepancies": [
+          "Critical discrepancies requiring attention"
+        ],
+        "warnings": [
+          "Non-critical issues to review"
+        ]
+      }
+    ],
+    "summary": {
+      "totalInvoicesAnalyzed": COUNT,
+      "successfulMatches": COUNT,
+      "addressConsistencyScore": "Address matching percentage",
+      "itemConsistencyScore": "Item data consistency percentage",
+      "financialConsistencyScore": "Financial data consistency percentage",
+      "overallComplianceScore": "Overall compliance rating",
+      "criticalDiscrepancies": COUNT,
+      "warnings": COUNT,
+      "resolvedAutomatically": COUNT
+    }
+  },
+  "complianceAssessment": {
+    "regulatoryCompliance": {
+      "hsCodeAccuracy": "HS code validation result",
+      "countryOfOrigin": "Origin documentation status",
+      "tradeAgreementEligibility": "Trade agreement compliance",
+      "restrictedItemsCheck": "Restrictions verification"
+    },
+    "documentationCheck": {
+      "requiredCertificates": ["Required certificates"],
+      "missingDocuments": ["Missing documentation"],
+      "validityStatus": "Document validity assessment"
+    },
+    "riskFactors": [
+      "Identified compliance risks"
+    ]
+  },
+  "validationResults": {
+    "dataAccuracy": "Overall data accuracy percentage",
+    "completenessScore": "Document completeness assessment",
+    "consistencyCheck": "Cross-document consistency rating",
+    "complianceStatus": "Customs compliance status",
+    "readyForSubmission": true/false,
+    "requiresReview": true/false
+  },
+  "recommendations": {
+    "immediateActions": [
+      "Urgent actions required"
+    ],
+    "improvements": [
+      "Suggested data improvements"
+    ],
+    "complianceActions": [
+      "Required compliance steps"
+    ],
+    "documentationUpdates": [
+      "Documentation update requirements"
+    ]
+  },
+  "processingStats": {
+    "filesProcessed": COUNT,
+    "contentDataAnalyzed": COUNT,
+    "crossChecksPerformed": COUNT,
+    "analysisDuration": "Processing time",
+    "timestamp": "Completion timestamp"
+  }
+}
+
+**Analysis Guidelines:**
+- Prioritize customs compliance and regulatory accuracy
+- Provide detailed quantitative assessments for all validations
+- Highlight critical discrepancies that could cause customs delays or rejection
+- Suggest specific remediation steps for identified issues
+
+Focus on providing comprehensive customs validation that ensures accurate documentation and compliance readiness.`;
+
+            // Prepare attachments array with available files
+            const attachments = [];
+
+            // Add custom declaration file if openAIFileId is available
+            if (customDeclarationId) {
+                attachments.push({
+                    file_id: customDeclarationId,
+                    tools: [{ "type": "file_search" }]
+                });
+            }
+
+            // // Add invoice files if available
+            // invoices.forEach(invoice => {
+            //     if (invoice.openAIFileId) {
+            //         attachments.push({
+            //             file_id: invoice.openAIFileId,
+            //             tools: [{ "type": "file_search" }]
+            //         });
+            //     }
+            // });
+
+            console.log(`Prepared ${attachments.length} file attachments for custom declaration analysis`);
+
+            // Add message to thread with attachments
+            await this.addMessageToThread(threadId, analysisInstructions, attachments);
+
+            // Create run for analysis
+            const run = await this.createRun(threadId, analysisInstructions);
+
+            // Wait for completion
+            const runStatus = await this.waitForRunCompletion(threadId, run.id);
+
+            if (runStatus.status !== 'completed') {
+                throw new Error(`Analysis run failed with status: ${runStatus.status}`);
+            }
+
+            // Get response messages
+            const messages = await this.getThreadMessages(threadId);
+
+            if (!messages || messages.length === 0) {
+                throw new Error('No analysis response received');
+            }
+
+            // Extract analysis response from AI
+            const aiMessage = messages[0];
+            let analysisResult = null;
+
+            if (aiMessage.content && aiMessage.content.length > 0) {
+                const responseText = aiMessage.content[0].text.value;
+                console.log('Raw AI response received for custom declaration analysis:', responseText.substring(0, 500) + '...');
+
+                analysisResult = this.extractJsonFromResponse(responseText);
+
+                if (!analysisResult) {
+                    // Fallback: create structured response from text
+                    analysisResult = {
+                        success: true,
+                        analysisType: "custom_declaration_comprehensive_validation",
+                        rawResponse: responseText,
+                        timestamp: new Date().toISOString(),
+                        projectInfo: analysisData.project,
+                        processingStats: analysisData
+                    };
+                }
+            } else {
+                throw new Error('Invalid response format from AI');
+            }
+
+            console.log('✅ Comprehensive custom declaration analysis completed successfully');
+
+            return {
+                success: true,
+                analysisData: analysisResult,
+                analyzedAt: new Date().toISOString(),
+                filesAnalyzed: attachments.length,
+                invoiceCount: invoices.length,
+                projectId: project.id,
+                customDeclarationId: customDeclarationId
+            };
+
+        } catch (error) {
+            console.error('❌ Error in custom declaration analysis with existing files:', error);
+
+            return {
+                success: false,
+                error: error.message,
+                analyzedAt: new Date().toISOString(),
+                filesAnalyzed: 0,
+                invoiceCount: 0,
+                projectId: project.id,
+                customDeclarationId: customDeclarationId
+            };
+        }
+    }
+
+    /**
+     * Analyze courier receipt document with content data
+     * @param {Object} project - Project object
+     * @param {Object} courierReceipt - Courier receipt object  
+     * @param {Array} invoices - Array of invoice objects with content data
+     * @param {string} threadId - OpenAI thread ID
+     * @returns {Promise<Object>} - Analysis result object
+     */
+    async analyzeCourierReceiptDocumentWithContentData(project, courierReceipt, invoices, threadId) {
+        try {
+            console.log(`Starting comprehensive courier receipt analysis with content data for project ${project.id}...`);
+
+            // Prepare comprehensive analysis data
+            const analysisData = {
+                project: {
+                    id: project.id,
+                    title: project.title,
+                    description: project.description
+                },
+                courierReceipt: {
+                    id: courierReceipt.id,
+                    fileName: courierReceipt.fileName,
+                    filePath: courierReceipt.filePath,
+                    fileContent: courierReceipt.fileContent,
+                    openAIFileId: courierReceipt.openAIFileId,
+                    status: courierReceipt.status
+                },
+                invoices: invoices.map(invoice => ({
+                    id: invoice.id,
+                    fileName: invoice.fileName || invoice.originalFileName,
+                    originalFileContent: invoice.originalFileContent,
+                    translatedFileContent: invoice.translatedFileContent,
+                })),
+                analysisTimestamp: new Date().toISOString(),
+                invoiceCount: invoices.length
+            };
+
+            console.log(`Prepared analysis data for ${invoices.length} invoices and courier receipt ${courierReceipt.fileName}`);
+
+            // Create comprehensive analysis instructions
+            const analysisInstructions = `You are analyzing a courier receipt document against invoice data for comprehensive shipping and delivery verification.
+
+**Analysis Context:**
+- Project: ${project.title} (ID: ${project.id})
+- Courier Receipt: ${courierReceipt.fileName}
+- Invoice Count: ${invoices.length}
+- Analysis Type: Comprehensive content-based comparison
+
+**Primary Objectives:**
+1. **Courier Receipt Analysis**: Extract shipping information, delivery details, tracking data, and shipment specifics
+2. **Invoice Comparison**: Compare courier receipt data against ${invoices.length} invoice(s) for accuracy and consistency
+3. **Data Validation**: Identify discrepancies, missing information, and data mismatches
+4. **Comprehensive Insights**: Provide detailed analysis of shipping process, delivery status, and document conformity
+
+**Courier Receipt Focus Areas:**
+- Shipping carrier information and tracking numbers
+- Origin and destination addresses and routes
+- Package dimensions, weight, and contents
+- Delivery dates, status, and recipient information
+- Shipping costs, fees, and method details
+- Special instructions or handling requirements
+
+**Invoice Cross-Reference Analysis:**
+- Compare courier receipt shipping details with invoice amounts and descriptions
+- Verify recipient information matches between documents
+- Cross-check delivery dates with invoice dates and terms
+- Validate shipping costs alignment with invoice line items
+- Identify any package or item discrepancies
+
+**Response Format Requirements:**
+Provide a comprehensive JSON response with the following structure:
+{
+  "success": true,
+  "analysisType": "courier_receipt_with_content_data",
+  "timestamp": "ISO_TIMESTAMP",
+  "projectInfo": {
+    "id": PROJECT_ID,
+    "title": "PROJECT_TITLE"
+  },
+  "courierReceiptAnalysis": {
+    "fileName": "FILENAME",
+    "shippingInfo": {
+      "carrier": "Carrier name",
+      "trackingNumber": "Tracking number",
+      "shipDate": "Ship date",
+      "estimatedDelivery": "Estimated delivery date",
+      "actualDelivery": "Actual delivery date",
+      "deliveryStatus": "Status",
+      "packageCount": "Number of packages"
+    },
+    "routingInfo": {
+      "origin": "Origin address",
+      "destination": "Destination address", 
+      "route": "Expected route",
+      "distance": "Distance if available"
+    },
+    "packageDetails": {
+      "dimensions": "Package dimensions",
+      "weight": "Package weight",
+      "contents": "Package contents summary",
+      "value": "Declared value",
+      "specialInstructions": "Special handling instructions"
+    },
+    "costBreakdown": {
+      "shippingCost": "Primary shipping cost",
+      "fees": "Additional fees breakdown",
+      "totalCost": "Total shipping cost",
+      "method": "Shipping method used"
+    }
+  },
+  "invoiceComparison": {
+    "matchedInvoices": [
+      {
+        "invoiceId": INVOICE_ID,
+        "fileName": "INVOICE_FILENAME",
+        "correlationScore": "Similarity percentage",
+        "matches": [
+          "Specific matching criteria"
+        ],
+        "discrepancies": [
+          "Specific differences found"
+        ]
+      }
+    ],
+    "summary": {
+      "totalInvoicesAnalyzed": COUNT,
+      "successfulMatches": COUNT,
+      "dataConsistencyScore": "Overall consistency percentage",
+      "criticalDiscrepancies": COUNT,
+      "warnings": COUNT
+    }
+  },
+  "insights": {
+    "keyFindings": [
+      "Important discoveries from analysis"
+    ],
+    "recommendations": [
+      "Suggested actions based on findings"
+    ],
+    "riskAssessment": {
+      "riskLevel": "LOW|MEDIUM|HIGH",
+      "riskFactors": [
+        "Potential issues identified"
+      ],
+      "mitigationSuggestions": [
+        "Recommendations to address risks"
+      ]
+    }
+  },
+  "validationResults": {
+    "dataAccuracy": "Accuracy assessment",
+    "completenessScore": "How complete the data is",
+    "consistencyCheck": "Cross-document consistency",
+    "complianceStatus": "Compliance with shipping requirements"
+  },
+  "processingStats": {
+    "filesProcessed": COUNT,
+    "contentDataAnalyzed": COUNT,
+    "analysisDuration": "Processing time",
+    "timestamp": "Completion timestamp"
+  }
+}
+
+**Analysis Guidelines:**
+- Prioritize accuracy over speed
+- Provide specific, actionable insights
+- Highlight critical discrepancies that require attention
+- Maintain professional business language
+- Include quantitative assessments where possible
+- Suggest concrete next steps for any issues found
+
+Focus on providing comprehensive, detailed analysis that will help users understand shipping status, delivery verification, and document accuracy.`;
+
+            // Prepare attachments array with available files
+            const attachments = [];
+
+            // Add courier receipt file if openAIFileId is available
+            if (courierReceipt.openAIFileId) {
+                attachments.push({
+                    file_id: courierReceipt.openAIFileId,
+                    tools: [{ "type": "file_search" }]
+                });
+            }
+
+            // // Add invoice files if available
+            // invoices.forEach(invoice => {
+            //     if (invoice.openAIFileId) {
+            //         attachments.push({
+            //             file_id: invoice.openAIFileId,
+            //             tools: [{ "type": "file_search" }]
+            //         });
+            //     }
+            // });
+
+            console.log(`Prepared ${attachments.length} file attachments for analysis`);
+
+            // Add message to thread with attachments
+            await this.addMessageToThread(threadId, analysisInstructions, attachments);
+
+            // Create run for analysis
+            const run = await this.createRun(threadId, analysisInstructions);
+
+            // Wait for completion
+            const runStatus = await this.waitForRunCompletion(threadId, run.id);
+
+            if (runStatus.status !== 'completed') {
+                throw new Error(`Analysis run failed with status: ${runStatus.status}`);
+            }
+
+            // Get response messages
+            const messages = await this.getThreadMessages(threadId);
+
+            if (!messages || messages.length === 0) {
+                throw new Error('No analysis response received');
+            }
+
+            // Extract analysis response from AI
+            const aiMessage = messages[0];
+            let analysisResult = null;
+
+            if (aiMessage.content && aiMessage.content.length > 0) {
+                const responseText = aiMessage.content[0].text.value;
+                console.log('Raw AI response received:', responseText.substring(0, 500) + '...');
+
+                analysisResult = this.extractJsonFromResponse(responseText);
+
+                if (!analysisResult) {
+                    // Fallback: create structured response from text
+                    analysisResult = {
+                        success: true,
+                        analysisType: "courier_receipt_with_content_data",
+                        rawResponse: responseText,
+                        timestamp: new Date().toISOString(),
+                        projectInfo: analysisData.project,
+                        processingStats: analysisData
+                    };
+                }
+            } else {
+                throw new Error('Invalid response format from AI');
+            }
+
+            console.log('✅ Comprehensive courier receipt analysis completed successfully');
+
+            return {
+                success: true,
+                analysisData: analysisResult,
+                analyzedAt: new Date().toISOString(),
+                filesAnalyzed: attachments.length,
+                invoiceCount: invoices.length,
+                projectId: project.id,
+                courierReceiptId: courierReceipt.id
+            };
+
+        } catch (error) {
+            console.error('❌ Error in courier receipt analysis with content data:', error);
+
+            return {
+                success: false,
+                error: error.message,
+                analyzedAt: new Date().toISOString(),
+                filesAnalyzed: 0,
+                invoiceCount: 0,
+                projectId: project.id,
+                courierReceiptId: courierReceipt.id
+            };
+        }
+    }
+
 }
 
 // Create and export singleton instance
