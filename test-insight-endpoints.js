@@ -90,6 +90,29 @@ const testData = {
     // Courier receipt insights to shipping services (with auto-generated subject)
     courierReceiptToShippingServicesAuto: {
         projectId: 1 // Subject will be auto-generated
+    },
+
+    // Shipment label insights to specific custom agent (simplified)
+    shipmentLabelInsightsCustom: {
+        projectId: "a20f4fd1-1dc5-4a3b-8a30-925d45fdd344", // Replace with actual project GUID
+        customAgentId: 1 // Replace with actual custom agent ID
+    },
+
+    // Shipment label insights to specific courier/shipping service (simplified)
+    shipmentLabelInsightsCourier: {
+        projectId: "a20f4fd1-1dc5-4a3b-8a30-925d45fdd344", // Replace with actual project GUID
+        courierId: 1 // Replace with actual courier/shipping service ID
+    },
+
+    // Shipment label insights to all users (explicit type)
+    shipmentLabelInsightsBoth: {
+        projectId: "a20f4fd1-1dc5-4a3b-8a30-925d45fdd344", // Replace with actual project GUID
+        type: "both"
+    },
+
+    // Shipment label insights (default - both types)
+    shipmentLabelInsightsDefault: {
+        projectId: "a20f4fd1-1dc5-4a3b-8a30-925d45fdd344" // Type will default to 'both'
     }
 };
 
@@ -216,6 +239,14 @@ async function runTests() {
     console.log('');
     await testCourierReceiptToShippingServicesAuto();
     console.log('');
+    await testShipmentLabelInsightsBoth();
+    console.log('');
+    await testShipmentLabelInsightsCustom();
+    console.log('');
+    await testShipmentLabelInsightsCourier();
+    console.log('');
+    await testShipmentLabelInsightsDefault();
+    console.log('');
 
     console.log('✨ All tests completed!');
 }
@@ -328,6 +359,74 @@ async function testCourierReceiptToShippingServicesAuto() {
     }
 }
 
+// Test shipment label insights to all users (explicit type)
+async function testShipmentLabelInsightsBoth() {
+    try {
+        console.log('Testing shipment label insights email (all users - explicit type)...');
+
+        const response = await axios.post(
+            `${BASE_URL}/insight/send-shipment-label-insights`,
+            testData.shipmentLabelInsightsBoth,
+            { headers }
+        );
+
+        console.log('✅ Shipment label insights email (all users - explicit type) sent successfully:', response.data);
+    } catch (error) {
+        console.error('❌ Error sending shipment label insights email (all users - explicit type):', error.response?.data || error.message);
+    }
+}
+
+// Test shipment label insights to specific custom agent
+async function testShipmentLabelInsightsCustom() {
+    try {
+        console.log('Testing shipment label insights email (specific custom agent)...');
+
+        const response = await axios.post(
+            `${BASE_URL}/insight/send-shipment-label-insights`,
+            testData.shipmentLabelInsightsCustom,
+            { headers }
+        );
+
+        console.log('✅ Shipment label insights email (specific custom agent) sent successfully:', response.data);
+    } catch (error) {
+        console.error('❌ Error sending shipment label insights email (specific custom agent):', error.response?.data || error.message);
+    }
+}
+
+// Test shipment label insights to specific courier/shipping service
+async function testShipmentLabelInsightsCourier() {
+    try {
+        console.log('Testing shipment label insights email (specific courier/shipping service)...');
+
+        const response = await axios.post(
+            `${BASE_URL}/insight/send-shipment-label-insights`,
+            testData.shipmentLabelInsightsCourier,
+            { headers }
+        );
+
+        console.log('✅ Shipment label insights email (specific courier/shipping service) sent successfully:', response.data);
+    } catch (error) {
+        console.error('❌ Error sending shipment label insights email (specific courier/shipping service):', error.response?.data || error.message);
+    }
+}
+
+// Test shipment label insights (default behavior)
+async function testShipmentLabelInsightsDefault() {
+    try {
+        console.log('Testing shipment label insights email (default behavior)...');
+
+        const response = await axios.post(
+            `${BASE_URL}/insight/send-shipment-label-insights`,
+            testData.shipmentLabelInsightsDefault,
+            { headers }
+        );
+
+        console.log('✅ Shipment label insights email (default behavior) sent successfully:', response.data);
+    } catch (error) {
+        console.error('❌ Error sending shipment label insights email (default behavior):', error.response?.data || error.message);
+    }
+}
+
 // Export functions for testing
 module.exports = {
     testProjectInsights,
@@ -342,6 +441,10 @@ module.exports = {
     testCustomDeclarationToShippingServicesAuto,
     testCourierReceiptToShippingServices,
     testCourierReceiptToShippingServicesAuto,
+    testShipmentLabelInsightsBoth,
+    testShipmentLabelInsightsCustom,
+    testShipmentLabelInsightsCourier,
+    testShipmentLabelInsightsDefault,
     runTests
 };
 

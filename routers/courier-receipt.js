@@ -10,14 +10,6 @@ router.post("/", authenticateToken, uploadMiddleware("courier").fields([{ name: 
 // Get all courier receipts with pagination and filters
 router.get("/", authenticateToken, courierReceiptController.getAll);
 
-// Get courier receipt by ID or GUID
-router.get("/:id", authenticateToken, courierReceiptController.getById);
-
-// Update courier receipt
-router.put("/:id", authenticateToken, courierReceiptController.update);
-
-// Delete courier receipt
-router.delete("/:id", authenticateToken, courierReceiptController.delete);
 
 // Get courier receipts by project
 router.get("/project/:projectId", authenticateToken, courierReceiptController.getByProject);
@@ -30,5 +22,15 @@ router.post("/analyze/:projectId", authenticateToken, courierReceiptController.a
 
 // Get courier receipt analysis results
 router.get("/analysis/:projectId", authenticateToken, courierReceiptController.getAnalysis);
+
+
+// Get courier receipt by ID or GUID
+router.get("/:id", authenticateToken, courierReceiptController.getById);
+
+// Update courier receipt
+router.put("/:id", authenticateToken, courierReceiptController.update);
+
+// Delete courier receipt
+router.delete("/:id", authenticateToken, courierReceiptController.delete);
 
 module.exports = router;

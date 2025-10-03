@@ -441,38 +441,62 @@ const controller = {
       const projectInvoices = await Invoice.findAll({
         where: { projectId: project.id },
       });
+      // Create thread ID if it doesn't exist
+      let threadId = project.aiConversation;
+      if (!threadId) {
+        threadId = await openAIHelper.createConversationId();
+        // Update project with new thread ID
+        await project.update({ aiConversation: threadId });
+      }
+
+      // Process invoices sequentially to avoid concurrent run conflicts
       for (const invoice of projectInvoices) {
-        await invoice.update(
-          {
-            status: "processing",
-          },
-          {
-            where: { id: invoice.id },
+        try {
+          console.log(`Processing invoice ${invoice.id} for project ${project.id}...`);
+
+          await invoice.update(
+            {
+              status: "processing",
+            },
+            {
+              where: { id: invoice.id },
+            }
+          );
+
+          // Process translation sequentially (not in parallel)
+          await openAIHelper.translateInvoice({
+            id: invoice.id,
+            originalFilePath: invoice.originalFilePath,
+            originalFileName: invoice.originalFileName,
+            language: project.language,
+            translatedLanguage: project.translatedLanguage,
+            currency: project.currency,
+            exchangeCurrency: project.exchangeCurrency,
+            exchangeRate: project.exchangeRate,
+          }, threadId);
+
+          console.log(`✅ Completed translation for invoice ${invoice.id}`);
+        } catch (invoiceError) {
+          console.error(`❌ Error processing invoice ${invoice.id}:`, invoiceError.message);
+
+          // Update invoice status to failed
+          try {
+            await invoice.update(
+              {
+                status: "failed",
+                insights: invoiceError.message,
+              },
+              {
+                where: { id: invoice.id },
+              }
+            );
+          } catch (updateError) {
+            console.error(`Failed to update invoice ${invoice.id} status:`, updateError.message);
           }
-        );
 
-
-        // Create thread ID if it doesn't exist
-        let threadId = project.aiConversation;
-        if (!threadId) {
-          threadId = await openAIHelper.createConversationId();
-          // Update project with new thread ID
-          await project.update({ aiConversation: threadId });
+          // Continue with next invoice instead of stopping the entire process
+          continue;
         }
-
-        // Start translation in background
-        const translationPromise = openAIHelper.translateInvoice({
-          id: invoice.id,
-          originalFilePath: invoice.originalFilePath,
-          originalFileName: invoice.originalFileName,
-          language: project.language,
-          translatedLanguage: project.translatedLanguage,
-          currency: project.currency,
-          exchangeCurrency: project.exchangeCurrency,
-          exchangeRate: project.exchangeRate,
-        }, threadId);
-
-
       }
       return sendResponseWithData(
         res,

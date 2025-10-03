@@ -18,13 +18,13 @@ const authenticateSession = async (req, res, next) => {
         null
       );
     }
-    
+
     // Get user data from session
     const user = await User.findOne({
       where: { id: req.session.userId },
       attributes: { exclude: ['password'] }
     });
-    
+
     if (!user) {
       return sendResponseWithData(
         res,
@@ -33,7 +33,7 @@ const authenticateSession = async (req, res, next) => {
         null
       );
     }
-    
+
     // Check if user is still active
     if (user.isActive === false) {
       return sendResponseWithData(
@@ -43,11 +43,11 @@ const authenticateSession = async (req, res, next) => {
         null
       );
     }
-    
+
     // Add user data to request object
     req.user = user;
     req.userId = req.session.userId;
-    
+
     next();
   } catch (err) {
     console.error("Session authentication middleware error:", err);
@@ -66,11 +66,9 @@ const authenticateSession = async (req, res, next) => {
  */
 const authenticateToken = async (req, res, next) => {
   try {
-    // Get token from header
-    console.log("authenticateToken called");
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-    
+
     if (!token) {
       return sendResponseWithData(
         res,
@@ -79,16 +77,16 @@ const authenticateToken = async (req, res, next) => {
         null
       );
     }
-    
+
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    
+
     // Get user data
     const user = await User.findOne({
       where: { id: decoded.userId },
       attributes: { exclude: ['password'] }
     });
-    
+
     if (!user) {
       return sendResponseWithData(
         res,
@@ -97,7 +95,7 @@ const authenticateToken = async (req, res, next) => {
         null
       );
     }
-    
+
     // Check if user is active
     if (user.isActive === false) {
       return sendResponseWithData(
@@ -107,17 +105,18 @@ const authenticateToken = async (req, res, next) => {
         null
       );
     }
-    
+
     // Add user data to request object
     req.user = user;
     req.token = token;
     req.userId = user.id;
     req.isSuperAdmin = user.isSuperAdmin || false;
     req.groupId = user.groupId;
-    
+    console.log("Authenticated user: ", user.firstName, user.lastName);
     next();
   } catch (err) {
     if (err.name === 'JsonWebTokenError') {
+      console.log("Invalid token", err.name);
       return sendResponseWithData(
         res,
         ErrorCode.UNAUTHORIZED,
@@ -125,6 +124,7 @@ const authenticateToken = async (req, res, next) => {
         null
       );
     } else if (err.name === 'TokenExpiredError') {
+      console.log("Token expired", err.name);
       return sendResponseWithData(
         res,
         ErrorCode.UNAUTHORIZED,
@@ -132,7 +132,7 @@ const authenticateToken = async (req, res, next) => {
         null
       );
     }
-    
+
     console.error("Authentication middleware error:", err);
     return sendResponseWithData(
       res,
@@ -151,7 +151,7 @@ const optionalAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.split(' ')[1];
-    
+
     if (token) {
       try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
@@ -159,7 +159,7 @@ const optionalAuth = async (req, res, next) => {
           where: { id: decoded.userId },
           attributes: { exclude: ['password'] }
         });
-        
+
         if (user && user.isActive !== false) {
           req.user = user;
           req.token = token;
@@ -170,7 +170,7 @@ const optionalAuth = async (req, res, next) => {
         console.log("Optional auth: Invalid token provided");
       }
     }
-    
+
     next();
   } catch (err) {
     console.error("Optional authentication middleware error:", err);
@@ -192,11 +192,11 @@ const requireRole = (requiredRole) => {
         null
       );
     }
-    
+
     // Add your role checking logic here
     // For example, check user.role === requiredRole
     // or check user.permissions.includes(requiredRole)
-    
+
     // For now, we'll just check if user exists and is authenticated
     next();
   };
@@ -216,7 +216,7 @@ const requireGroup = (requiredGroupId) => {
         null
       );
     }
-    
+
     if (req.user.groupId !== requiredGroupId) {
       return sendResponseWithData(
         res,
@@ -225,7 +225,7 @@ const requireGroup = (requiredGroupId) => {
         null
       );
     }
-    
+
     next();
   };
 };

@@ -9,6 +9,64 @@ const _ = require("lodash");
 const activityHelper = require("../helper/activityHelper");
 const openAIHelper = require("../helper/openai-helper");
 const controller = {
+  // Reusable function to analyze custom declaration
+  analyzeCustomDeclaration: async function (customDeclaration, project, invoices) {
+    try {
+      // Check if custom declaration has required file
+      if (!customDeclaration.filePath || !customDeclaration.fileName) {
+        throw new Error("Custom declaration file is missing");
+      }
+
+      if (invoices.length === 0) {
+        throw new Error("No invoices with OpenAI file IDs found for this project. Custom declaration analysis requires invoices that have been uploaded to OpenAI for comparison.");
+      }
+
+      // Get or create AI conversation thread
+      let threadId = project.aiConversation;
+      if (!threadId) {
+        threadId = await openAIHelper.createConversationId();
+        // Update project with new thread ID
+        await project.update({ aiConversation: threadId });
+      }
+
+      // Note: Custom declaration model doesn't have a status field
+      // The analysis will update the insights field when complete
+
+      // Start comprehensive analysis in background
+      const analysisPromise = openAIHelper.analyzeCustomDeclarationDocument(project, customDeclaration, invoices);
+
+      // Handle the promise to avoid unhandled promise rejection
+      analysisPromise
+        .then((result) => {
+          console.log(`Custom declaration analysis completed for custom declaration ${customDeclaration.id}:`, result);
+
+          // Check if insights were updated
+          if (result.success && result.analysisData) {
+            console.log(`✅ Insights successfully updated for custom declaration ${customDeclaration.id}`);
+          } else {
+            console.log(`❌ Insights NOT updated for custom declaration ${customDeclaration.id}`);
+            console.log('Result:', result);
+          }
+        })
+        .catch((error) => {
+          console.error(`Custom declaration analysis failed for custom declaration ${customDeclaration.id}:`, error);
+        });
+
+      return {
+        success: true,
+        status: "processing",
+        projectId: project.id,
+        customDeclarationId: customDeclaration.id,
+        threadId: threadId,
+        invoicesCount: invoices.length,
+        message: "Comprehensive analysis is running in the background. This includes invoice comparison and mismatch detection. Check the custom declaration status for updates."
+      };
+    } catch (error) {
+      console.error("Custom declaration analysis failed:", error);
+      throw error;
+    }
+  },
+
   // Create new custom declaration
   create: async function (req, res) {
     try {
@@ -36,12 +94,17 @@ const controller = {
       }
 
       let originalFilePath = null;
-      if (req?.files && req?.files["files[]"]) {
-        originalFilePath = req?.files["files[]"][0]?.path;
-      }
       let fileName = null;
       if (req?.files && req?.files["files[]"]) {
-        fileName = req?.files["files[]"][0]?.filename;
+        originalFilePath = req?.files["files[]"][0]?.path;
+        // Use originalname to preserve the original uploaded filename
+        fileName = req?.files["files[]"][0]?.originalname || req?.files["files[]"][0]?.filename;
+
+        console.log('File upload details:');
+        console.log('- Original filename:', req?.files["files[]"][0]?.originalname);
+        console.log('- Generated filename:', req?.files["files[]"][0]?.filename);
+        console.log('- Saved filename:', fileName);
+        console.log('- File path:', originalFilePath);
       }
       data.projectId = project.id;
       data.groupId = group.id;
@@ -62,7 +125,11 @@ const controller = {
 
       let responseData = {
         status: "success",
-        data: customDeclaration,
+        data: {
+          ...customDeclaration.toJSON(),
+          originalFileName: fileName,
+          filePath: originalFilePath
+        },
       };
 
       return sendResponseWithData(
@@ -400,7 +467,7 @@ const controller = {
   analyze: async function (req, res) {
     try {
       const { projectId } = req.params;
-      const project = await Project.findOne({ where: { id: projectId } });
+      const project = await Project.findOne({ where: { guid: projectId } });
       if (!project) {
         return sendResponseWithData(
           res,
@@ -411,7 +478,7 @@ const controller = {
       }
 
       const customDeclaration = await CustomDeclaration.findOne({
-        where: { projectId: projectId },
+        where: { projectId: project.id },
         order: [['createdAt', 'DESC']]
       });
 
@@ -424,66 +491,23 @@ const controller = {
         );
       }
 
-      // Check if custom declaration has required file
-      if (!customDeclaration.filePath || !customDeclaration.fileName) {
-        return sendResponseWithData(
-          res,
-          ErrorCode.BAD_REQUEST,
-          "Custom declaration file is missing",
-          null
-        );
-      }
-
       // Get all invoices for this project to compare with custom declaration
       const invoices = await Invoice.findAll({
-        where: { projectId: projectId },
+        where: {
+          projectId: project.id,
+          openAIFileId: { [Op.ne]: null } // Only invoices that have been uploaded to OpenAI
+        },
         order: [['createdAt', 'DESC']]
       });
 
-      if (invoices.length === 0) {
-        return sendResponseWithData(
-          res,
-          ErrorCode.NOT_FOUND,
-          "No invoices found for this project. Custom declaration analysis requires invoices for comparison.",
-          null
-        );
-      }
-
-      // Get or create AI conversation thread
-      let threadId = project.aiConversation;
-      if (!threadId) {
-        threadId = await openAIHelper.createConversationId();
-        // Update project with new thread ID
-        await project.update({ aiConversation: threadId });
-      }
-
-      // Update custom declaration status to processing
-      await customDeclaration.update({ status: "processing" });
-
-      // Start comprehensive analysis in background
-      const analysisPromise = openAIHelper.analyzeCustomDeclarationDocument(project, customDeclaration, invoices);
-
-      // Handle the promise to avoid unhandled promise rejection
-      analysisPromise
-        .then((result) => {
-          console.log(`Custom declaration analysis completed for project ${projectId}:`, result);
-        })
-        .catch((error) => {
-          console.error(`Custom declaration analysis failed for project ${projectId}:`, error);
-        });
+      // Use the reusable analysis function
+      const result = await controller.analyzeCustomDeclaration(customDeclaration, project, invoices);
 
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
         "Custom declaration analysis started successfully",
-        {
-          status: "processing",
-          projectId: projectId,
-          customDeclarationId: customDeclaration.id,
-          threadId: threadId,
-          invoicesCount: invoices.length,
-          message: "Comprehensive analysis is running in the background. This includes invoice comparison and mismatch detection. Check the custom declaration status for updates."
-        }
+        result
       );
 
     } catch (err) {
@@ -492,16 +516,107 @@ const controller = {
         res,
         ErrorCode.REQUEST_FAILED,
         "Unable to start custom declaration analysis",
-        err
+        err.message
+      );
+    }
+  },
+
+  // Analyze custom declaration by ID
+  analyzeById: async function (req, res) {
+    try {
+      const { id } = req.params;
+      const loggedInUserGroupId = req.groupId; // From auth middleware
+
+      // Find custom declaration by ID or GUID
+      const customDeclaration = await CustomDeclaration.findOne({
+        where: {
+          [Op.or]: [{ id: id }, { guid: id }],
+          groupId: loggedInUserGroupId // Ensure it belongs to user's group
+        },
+        include: [
+          {
+            model: Project,
+            as: "project",
+            attributes: ["id", "title", "guid", "aiConversation"]
+          }
+        ]
+      });
+
+      if (!customDeclaration) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Custom declaration not found or access denied",
+          null
+        );
+      }
+
+      const project = customDeclaration.project;
+      if (!project) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Project not found for this custom declaration",
+          null
+        );
+      }
+
+      // Get all invoices for this project to compare with custom declaration
+      const invoices = await Invoice.findAll({
+        where: {
+          projectId: project.id,
+          openAIFileId: { [Op.ne]: null } // Only invoices that have been uploaded to OpenAI
+        },
+        order: [['createdAt', 'DESC']]
+      });
+
+      // Use the reusable analysis function
+      const result = await controller.analyzeCustomDeclaration(customDeclaration, project, invoices);
+
+      // Log activity
+      await activityHelper.logActivity({
+        userId: req.userId,
+        groupId: loggedInUserGroupId,
+        action: 'analyze_custom_declaration_by_id',
+        description: `Started analysis for custom declaration "${customDeclaration.fileName}" (ID: ${customDeclaration.id})`,
+        createdBy: req.userId,
+        projectId: project.id,
+        details: {
+          customDeclarationId: customDeclaration.id,
+          customDeclarationFileName: customDeclaration.fileName,
+          projectTitle: project.title,
+          invoicesCount: invoices.length
+        }
+      });
+
+      return sendResponseWithData(
+        res,
+        SuccessCode.SUCCESS,
+        "Custom declaration analysis started successfully",
+        {
+          ...result,
+          customDeclarationId: customDeclaration.id,
+          customDeclarationFileName: customDeclaration.fileName,
+          projectTitle: project.title
+        }
+      );
+
+    } catch (err) {
+      console.error("Custom declaration analysis by ID failed:", err);
+      return sendResponseWithData(
+        res,
+        ErrorCode.REQUEST_FAILED,
+        "Unable to start custom declaration analysis",
+        err.message
       );
     }
   },
 
   // Get custom declaration analysis results
-  getAnalysis: async function (req, res) {
+  getAnalyze: async function (req, res) {
     try {
       const { projectId } = req.params;
-      const project = await Project.findOne({ where: { id: projectId } });
+      const project = await Project.findOne({ where: { guid: projectId } });
       if (!project) {
         return sendResponseWithData(
           res,
@@ -512,7 +627,7 @@ const controller = {
       }
 
       const customDeclaration = await CustomDeclaration.findOne({
-        where: { projectId: projectId },
+        where: { projectId: project.id },
         order: [['createdAt', 'DESC']]
       });
 
@@ -524,6 +639,8 @@ const controller = {
           null
         );
       }
+
+      //code here
 
       let analysisData = null;
       if (customDeclaration.insights) {

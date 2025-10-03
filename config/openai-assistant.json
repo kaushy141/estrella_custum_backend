@@ -1,5 +1,5 @@
 {
-  "assistantId": "asst_VdzxdGuhgWcscNzx1ocjseDt",
+  "assistantId": "asst_APG3zGo5ag4zpn2xFgS5l8ck",
   "name": "Invoice Translation Assistant",
   "model": "gpt-4o-mini",
   "description": "Professional assistant for translating invoices and comparing mismatches between original and translated invoices or between invoice and customs clearance documents.",
@@ -21,9 +21,9 @@
   ],
   "metadata": {
     "created_by": "estrella-backend",
-    "created_at": "2025-09-29T07:44:58.881Z",
+    "created_at": "2025-09-30T18:01:37.598Z",
     "version": "1.0.0"
   },
-  "createdAt": 1759131899,
-  "updatedAt": "2025-09-29T07:44:59.998Z"
+  "createdAt": 1759255318,
+  "updatedAt": "2025-09-30T18:02:03.247Z"
 }

@@ -35,6 +35,10 @@ const CourierReceipt = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: true,
     },
+    openAIFileId: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
     insights: {
       type: DataTypes.TEXT,
       allowNull: true,

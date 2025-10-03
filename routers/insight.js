@@ -13,6 +13,9 @@ router.post("/send-project-insights", validationMiddleware.validateProjectInsigh
 // Send custom declaration insights email to active custom agents and shipping service users
 router.post("/send-custom-declaration-insights", validationMiddleware.validateCustomDeclarationInsights, insightController.sendCustomDeclarationInsights);
 
+// Send shipment label insights email to active custom agents and shipping service users
+router.post("/send-shipment-label-insights", validationMiddleware.validateShipmentLabelInsights, insightController.sendShipmentLabelInsights);
+
 // Send combined insights (invoice + custom declaration) to all relevant recipients
 router.post("/send-combined-insights", validationMiddleware.validateCombinedInsights, insightController.sendCombinedInsights);
 

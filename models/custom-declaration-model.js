@@ -32,6 +32,10 @@ const CustomDeclaration = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: true,
     },
+    openAIFileId: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
     fileName: {
       type: DataTypes.STRING(100),
       allowNull: true,

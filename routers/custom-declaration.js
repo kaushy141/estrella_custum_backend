@@ -28,7 +28,10 @@ router.get("/group/:groupId", authenticateToken, customDeclarationController.get
 // Analyze custom declaration document with comprehensive invoice comparison
 router.post("/analyze/:projectId", authenticateToken, customDeclarationController.analyze);
 
+// Analyze custom declaration by ID
+router.post("/analyze-by-id/:id", authenticateToken, customDeclarationController.analyzeById);
+
 // Get custom declaration analysis results
-router.get("/analysis/:projectId", authenticateToken, customDeclarationController.getAnalysis);
+router.get("/analyze/:projectId", authenticateToken, customDeclarationController.getAnalyze);
 
 module.exports = router;

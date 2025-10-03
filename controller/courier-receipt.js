@@ -14,7 +14,7 @@ const controller = {
       const data = req.body;
 
       // Verify project exists
-      const project = await Project.findOne({ guid: data.projectId });
+      const project = await Project.findOne({ where: { guid: data.projectId } });
       if (!project) {
         return sendResponseWithData(
           res,
@@ -23,9 +23,12 @@ const controller = {
           null
         );
       }
+      console.log("data", data.projectId);
+      console.log("project", project);
 
       // Verify group exists
-      const group = await Group.findOne({ guid: data.groupId });
+      console.log("data", data.groupId);
+      const group = await Group.findOne({ where: { guid: data.groupId } });
       if (!group) {
         return sendResponseWithData(
           res,
@@ -34,6 +37,9 @@ const controller = {
           null
         );
       }
+
+      console.log("group", group);
+
       let originalFilePath = null;
       if (req?.files && req?.files["files[]"]) {
         originalFilePath = req?.files["files[]"][0]?.path;
@@ -63,6 +69,10 @@ const controller = {
       let responseData = {
         status: "success",
         data: courierReceipt,
+        otherData: {
+          project,
+          group
+        }
       };
 
       return sendResponseWithData(
@@ -407,9 +417,10 @@ const controller = {
 
   // Analyze courier receipt document
   analyze: async function (req, res) {
+    console.log("analyze courier receipt", req.params.projectId);
     try {
       const { projectId } = req.params;
-      const project = await Project.findOne({ where: { id: projectId } });
+      const project = await Project.findOne({ where: { guid: projectId } });
       if (!project) {
         return sendResponseWithData(
           res,
@@ -419,8 +430,10 @@ const controller = {
         );
       }
 
+      console.log("project", project);
+
       const courierReceipt = await CourierReceipt.findOne({
-        where: { projectId: projectId },
+        where: { projectId: project.id },
         order: [['createdAt', 'DESC']]
       });
 
@@ -461,9 +474,29 @@ const controller = {
       analysisPromise
         .then((result) => {
           console.log(`Courier receipt analysis completed for project ${projectId}:`, result);
+
+          // Update courier receipt with analysis results
+          if (result.success) {
+            courierReceipt.update({
+              status: "completed",
+              analysisData: result.analysisData,
+              analyzedAt: result.analyzedAt,
+              filesAnalyzed: result.filesAnalyzed
+            }).catch(updateError => {
+              console.error(`Failed to update courier receipt with analysis results:`, updateError);
+            });
+          }
         })
         .catch((error) => {
           console.error(`Courier receipt analysis failed for project ${projectId}:`, error);
+
+          // Update courier receipt status to failed
+          courierReceipt.update({
+            status: "failed",
+            errorMessage: error.message
+          }).catch(updateError => {
+            console.error(`Failed to update courier receipt status to failed:`, updateError);
+          });
         });
 
       return sendResponseWithData(

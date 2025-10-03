@@ -3,13 +3,16 @@ const { Group } = require("../models/group-model");
 const { sendResponseWithData } = require("../helper/commonResponseHandler");
 const { SuccessCode, ErrorCode } = require("../helper/statusCode");
 const _ = require("lodash");
+const { User } = require("../models/user-model");
 const controller = {
   // Create new custom agent
   create: async function (req, res) {
     try {
       const data = req.body;
       // Verify group exists
-      const group = await Group.findByPk(data.groupId);
+      const userId = req.userId;
+      const user = await User.findByPk(userId);
+      const group = await Group.findByPk(user.groupId);
       if (!group) {
         return sendResponseWithData(
           res,
@@ -18,7 +21,7 @@ const controller = {
           null
         );
       }
-
+      data.groupId = group.id;
       const customAgent = await CustomAgent.create(data);
       let responseData = {
         status: "success",

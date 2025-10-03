@@ -32,6 +32,10 @@ const CustomClearance = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: false,
     },
+    openAIFileId: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
     insights: {
       type: DataTypes.TEXT,
       allowNull: false,

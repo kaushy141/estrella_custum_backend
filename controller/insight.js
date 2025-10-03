@@ -217,6 +217,94 @@ function generateCourierReceiptFiles(courierReceipts) {
     }));
 }
 
+// Helper function to generate insights message from project courier receipts (shipment documents)
+function generateShipmentLabelInsightsMessage(project, courierReceipts) {
+    let message = `Shipment Label Insights for: ${project.title}\n\n`;
+
+    if (project.description) {
+        message += `Project Description: ${project.description}\n\n`;
+    }
+
+    message += `Total Shipment Documents: ${courierReceipts.length}\n\n`;
+
+    // Group courier receipts by status
+    const statusGroups = {};
+    courierReceipts.forEach(receipt => {
+        const status = receipt.status || 'unknown';
+        if (!statusGroups[status]) {
+            statusGroups[status] = [];
+        }
+        statusGroups[status].push(receipt);
+    });
+
+    // Add status summary
+    message += "Shipment Document Status Summary:\n";
+    Object.keys(statusGroups).forEach(status => {
+        message += `• ${status}: ${statusGroups[status].length} documents\n`;
+    });
+    message += "\n";
+
+    // Add insights from courier receipts that have them
+    const receiptsWithInsights = courierReceipts.filter(receipt => receipt.insights && receipt.insights.trim());
+    if (receiptsWithInsights.length > 0) {
+        message += "Key Insights:\n";
+        receiptsWithInsights.forEach((receipt, index) => {
+            message += `${index + 1}. ${receipt.fileName || `Shipment Document ${receipt.id}`}:\n`;
+
+            // Try to parse insights if it's JSON, otherwise display as text
+            try {
+                const insightsData = JSON.parse(receipt.insights);
+                if (insightsData.courierReceiptAnalysis) {
+                    const analysis = insightsData.courierReceiptAnalysis;
+                    message += `   Tracking Number: ${analysis.trackingNumber || 'N/A'}\n`;
+                    message += `   Courier Company: ${analysis.courierCompany || 'N/A'}\n`;
+                    message += `   Delivery Date: ${analysis.deliveryDate || 'N/A'}\n`;
+                    message += `   Delivery Status: ${analysis.deliveryStatus || 'N/A'}\n`;
+                }
+                if (insightsData.summary && insightsData.summary.overallShippingHealth) {
+                    message += `   Overall Shipping Health: ${insightsData.summary.overallShippingHealth}\n`;
+                }
+                if (insightsData.insights && insightsData.insights.length > 0) {
+                    message += `   Key Recommendations:\n`;
+                    insightsData.insights.forEach(insight => {
+                        message += `     • ${insight.title || insight.description || 'Recommendation'}\n`;
+                    });
+                }
+            } catch (e) {
+                // If not JSON, display as plain text
+                message += `   ${receipt.insights}\n`;
+            }
+            message += "\n";
+        });
+    } else {
+        message += "No specific insights available for shipment documents at this time.\n\n";
+    }
+
+    message += "Please review the shipment document details and contact us if you need any clarification.\n\n";
+    message += "Thank you for using our services.";
+
+    return message;
+}
+
+// Helper function to generate shipment label subject based on project and courier receipts
+function generateShipmentLabelSubject(project, courierReceipts) {
+    const projectTitle = project.title || 'Project';
+    const receiptCount = courierReceipts.length;
+    const currentDate = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+
+    if (receiptCount === 0) {
+        return `Shipment Label Insights Report - ${projectTitle}`;
+    } else if (receiptCount === 1) {
+        return `Shipment Label Analysis Report - ${projectTitle} (${currentDate})`;
+    } else {
+        return `Shipment Label Insights Report - ${projectTitle} (${receiptCount} Documents) - ${currentDate}`;
+    }
+}
+
 const controller = {
     // Send project insights email to active custom agents
     sendProjectInsights: async function (req, res) {
@@ -1343,6 +1431,241 @@ const controller = {
                 res,
                 ErrorCode.REQUEST_FAILED,
                 "Unable to send courier receipt insights email to shipping services",
+                err
+            );
+        }
+    },
+
+    // Send shipment label insights email to active custom agents and/or shipping service users
+    sendShipmentLabelInsights: async function (req, res) {
+        try {
+            const { projectId, type, customAgentId, courierId } = req.body;
+            const loggedInUserGroupId = req.groupId; // From auth middleware
+
+            // Validate required fields
+            if (!projectId) {
+                return sendResponseWithData(
+                    res,
+                    ErrorCode.BAD_REQUEST,
+                    "projectId is required",
+                    null
+                );
+            }
+
+            // Auto-detect recipient type based on provided IDs
+            let recipientType = 'both'; // default
+
+            if (customAgentId && courierId) {
+                return sendResponseWithData(
+                    res,
+                    ErrorCode.BAD_REQUEST,
+                    "Cannot specify both customAgentId and courierId. Please provide only one.",
+                    null
+                );
+            } else if (customAgentId) {
+                recipientType = 'custom';
+            } else if (courierId) {
+                recipientType = 'courier';
+            } else if (type) {
+                // If type is explicitly provided, use it
+                if (!['custom', 'courier', 'both'].includes(type.toLowerCase())) {
+                    return sendResponseWithData(
+                        res,
+                        ErrorCode.BAD_REQUEST,
+                        "type must be 'custom', 'courier', or 'both'",
+                        null
+                    );
+                }
+                recipientType = type.toLowerCase();
+            }
+
+            // Find the project
+            const project = await Project.findOne({
+                where: {
+                    guid: projectId,
+                    groupId: loggedInUserGroupId, // Ensure project belongs to user's group
+                },
+                include: [
+                    {
+                        model: Group,
+                        as: "group",
+                        attributes: ["id", "name"],
+                    },
+                ],
+            });
+
+            if (!project) {
+                return sendResponseWithData(
+                    res,
+                    ErrorCode.NOT_FOUND,
+                    "Project not found or access denied",
+                    null
+                );
+            }
+
+            // Get all courier receipts (shipment documents) for this project
+            const courierReceipts = await CourierReceipt.findAll({
+                where: {
+                    projectId: project.id,
+                    groupId: loggedInUserGroupId,
+                },
+                attributes: ["id", "insights", "fileName", "status"],
+            });
+
+            if (courierReceipts.length === 0) {
+                return sendResponseWithData(
+                    res,
+                    ErrorCode.NOT_FOUND,
+                    "No shipment documents (courier receipts) found for this project",
+                    null
+                );
+            }
+
+            // Generate subject if not provided
+            const emailSubject = generateShipmentLabelSubject(project, courierReceipts);
+
+            // Generate insights message from courier receipts
+            const insightsMessage = generateShipmentLabelInsightsMessage(project, courierReceipts);
+
+            // Find custom agents based on type and specific ID
+            let customAgents = [];
+            if (recipientType === 'custom' || recipientType === 'both') {
+                const customAgentWhere = {
+                    groupId: loggedInUserGroupId,
+                    isActive: true,
+                };
+
+                // If specific customAgentId is provided, use only that agent
+                if (recipientType === 'custom' && customAgentId) {
+                    customAgentWhere.$or = [{ id: customAgentId }, { guid: customAgentId }];
+                }
+
+                customAgents = await CustomAgent.findAll({
+                    where: customAgentWhere,
+                    include: [
+                        {
+                            model: Group,
+                            as: "group",
+                            attributes: ["id", "name"],
+                        },
+                    ],
+                });
+            }
+
+            // Find shipping services based on type and specific ID
+            let shippingServices = [];
+            if (recipientType === 'courier' || recipientType === 'both') {
+                const shippingServiceWhere = {
+                    groupId: loggedInUserGroupId,
+                    isActive: true,
+                };
+
+                // If specific courierId is provided, use only that service
+                if (recipientType === 'courier' && courierId) {
+                    shippingServiceWhere.$or = [{ id: courierId }, { guid: courierId }];
+                }
+
+                shippingServices = await ShippingService.findAll({
+                    where: shippingServiceWhere,
+                    include: [
+                        {
+                            model: Group,
+                            as: "group",
+                            attributes: ["id", "name"],
+                        },
+                    ],
+                });
+            }
+
+            // Combine recipients based on type
+            let allRecipients = [];
+
+            if (recipientType === 'custom' || recipientType === 'both') {
+                allRecipients = [
+                    ...allRecipients,
+                    ...customAgents.map(agent => ({
+                        email: agent.email,
+                        name: agent.name,
+                        type: 'Custom Agent'
+                    }))
+                ];
+            }
+
+            if (recipientType === 'courier' || recipientType === 'both') {
+                allRecipients = [
+                    ...allRecipients,
+                    ...shippingServices.map(service => ({
+                        email: service.email,
+                        name: service.name,
+                        type: 'Shipping Service'
+                    }))
+                ];
+            }
+
+            if (allRecipients.length === 0) {
+                const typeMessage = recipientType === 'custom' ? 'custom agents' :
+                    recipientType === 'courier' ? 'shipping services' :
+                        'custom agents or shipping services';
+                return sendResponseWithData(
+                    res,
+                    ErrorCode.NOT_FOUND,
+                    `No active ${typeMessage} found in your group`,
+                    null
+                );
+            }
+
+            // Send email to all recipients
+            const emailPromises = allRecipients.map(recipient =>
+                mailHelper.sent(
+                    recipient.email,
+                    emailSubject,
+                    "insights",
+                    {
+                        name: recipient.name,
+                        message: insightsMessage
+                    }
+                )
+            );
+
+            await Promise.all(emailPromises);
+
+            // Log activity
+            await activityHelper.logActivity({
+                userId: req.userId,
+                groupId: loggedInUserGroupId,
+                action: 'send_shipment_label_insights',
+                description: `Sent shipment label insights to ${allRecipients.length} recipients for project "${project.title}"`,
+                createdBy: req.userId,
+                projectId: project.id,
+                details: {
+                    projectTitle: project.title,
+                    recipientType: recipientType,
+                    recipientCount: allRecipients.length,
+                    shipmentDocumentCount: courierReceipts.length,
+                    recipients: allRecipients.map(r => ({ email: r.email, type: r.type }))
+                }
+            });
+
+            return sendResponseWithData(
+                res,
+                SuccessCode.SUCCESS,
+                `Shipment label insights email sent successfully to ${allRecipients.length} recipients`,
+                {
+                    projectId: project.id,
+                    projectTitle: project.title,
+                    recipientType: recipientType,
+                    recipientsCount: allRecipients.length,
+                    shipmentDocumentCount: courierReceipts.length,
+                    recipients: allRecipients.map(r => ({ email: r.email, type: r.type }))
+                }
+            );
+
+        } catch (err) {
+            console.error("Error sending shipment label insights email:", err);
+            return sendResponseWithData(
+                res,
+                ErrorCode.REQUEST_FAILED,
+                "Unable to send shipment label insights email",
                 err
             );
         }

@@ -51,6 +51,14 @@ const Invoice = sequelize.define(
       type: DataTypes.STRING(50),
       allowNull: true,
     },
+    openAIFileId: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
+    openAITranslatedFileId: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
     status: {
       type: DataTypes.STRING(50),//uploaded, processing, completed, failed
       allowNull: true,

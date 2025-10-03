@@ -302,6 +302,50 @@ const validateCourierReceiptInsightsToShippingServices = function (req, res, nex
   }
 };
 
+// Validation middleware for shipment label insights email endpoint
+const validateShipmentLabelInsights = function (req, res, next) {
+  try {
+    const { projectId, type, customAgentId, courierId } = req.body;
+
+    if (!isValidBody(req.body)) {
+      return res.status(400).json({
+        status: false,
+        message: "Request body cannot be empty",
+      });
+    }
+
+    if (!projectId) {
+      return res.status(400).json({
+        status: false,
+        message: "projectId is required",
+      });
+    }
+
+    // Validate that both IDs are not provided simultaneously
+    if (customAgentId && courierId) {
+      return res.status(400).json({
+        status: false,
+        message: "Cannot specify both customAgentId and courierId. Please provide only one.",
+      });
+    }
+
+    // Type is optional - validates if provided
+    if (type && !['custom', 'courier', 'both'].includes(type.toLowerCase())) {
+      return res.status(400).json({
+        status: false,
+        message: "type must be 'custom', 'courier', or 'both'",
+      });
+    }
+
+    next();
+  } catch (error) {
+    return res.status(500).json({
+      status: false,
+      message: "Validation error: " + error.message,
+    });
+  }
+};
+
 module.exports = {
   isValid,
   isValidBody,
@@ -316,4 +360,5 @@ module.exports = {
   validateCustomDeclarationInsightsToAgents,
   validateCustomDeclarationInsightsToShippingServices,
   validateCourierReceiptInsightsToShippingServices,
+  validateShipmentLabelInsights,
 };

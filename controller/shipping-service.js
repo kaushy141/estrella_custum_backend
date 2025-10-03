@@ -6,13 +6,16 @@ const _ = require("lodash");
 const activityHelper = require("../helper/activityHelper");
 const { Project } = require("../models/project-model");
 const openAIHelper = require("../helper/openai-helper");
+const { User } = require("../models/user-model");
 const controller = {
   // Create new shipping service
   create: async function (req, res) {
     try {
       const data = req.body;
+      const userId = req.userId;
+      const user = await User.findByPk(userId);
       // Verify group exists
-      const group = await Group.findByPk(data.groupId);
+      const group = await Group.findByPk(user.groupId);
       if (!group) {
         return sendResponseWithData(
           res,
@@ -21,6 +24,7 @@ const controller = {
           null
         );
       }
+      data.groupId = group.id;
       const shippingService = await ShippingService.create(data);
       // Log activity
       try {

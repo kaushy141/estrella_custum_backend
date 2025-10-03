@@ -107,6 +107,73 @@ Always provide professional, accurate, and detailed responses suitable for busin
         }
     }
 
+    /**
+     * Clean up existing runs in a thread
+     * @param {string} threadId - OpenAI thread ID
+     */
+    async cleanupThreadRuns(threadId) {
+        try {
+            console.log(`🧹 Cleaning up active runs in thread: ${threadId}`);
+
+            const existingRuns = await this.openai.beta.threads.runs.list(threadId);
+            const activeRuns = existingRuns.data.filter(run =>
+                run.status === 'queued' || run.status === 'in_progress'
+            );
+
+            if (activeRuns.length > 0) {
+                console.log(`Found ${activeRuns.length} active runs in thread ${threadId}, cancelling them...`);
+
+                // Cancel all active runs and wait for completion
+                const cancelPromises = activeRuns.map(async (activeRun) => {
+                    try {
+                        await this.openai.beta.threads.runs.cancel(threadId, activeRun.id);
+                        console.log(`✅ Cancelled run: ${activeRun.id}`);
+                        return { success: true, runId: activeRun.id };
+                    } catch (cancelError) {
+                        console.log(`⚠️ Could not cancel run ${activeRun.id}:`, cancelError.message);
+                        return { success: false, runId: activeRun.id, error: cancelError.message };
+                    }
+                });
+
+                // Wait for all cancellations to complete
+                const results = await Promise.allSettled(cancelPromises);
+
+                const successful = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+                const failed = results.length - successful;
+
+                console.log(`🧹 Cleanup completed: ${successful} cancelled, ${failed} failed`);
+
+                // Wait longer to ensure cancellation is fully processed
+                if (successful > 0) {
+                    console.log(`⏳ Waiting 3 seconds for cancellations to process...`);
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                }
+
+                // Double-check that runs are actually cancelled
+                try {
+                    const recheckRuns = await this.openai.beta.threads.runs.list(threadId);
+                    const stillActiveRuns = recheckRuns.data.filter(run =>
+                        run.status === 'queued' || run.status === 'in_progress'
+                    );
+
+                    if (stillActiveRuns.length > 0) {
+                        console.log(`⚠️ Warning: ${stillActiveRuns.length} runs still active after cleanup. This may cause conflicts.`);
+                        // Wait a bit more for these to finish naturally
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    } else {
+                        console.log(`✅ All runs successfully cleaned up`);
+                    }
+                } catch (recheckError) {
+                    console.log(`Could not recheck run status:`, recheckError.message);
+                }
+            } else {
+                console.log(`✅ No active runs found in thread ${threadId}`);
+            }
+        } catch (error) {
+            console.error('❌ Error during thread cleanup:', error.message);
+            // Don't throw - we want to continue even if cleanup fails
+        }
+    }
 
     /**
      * Create a run for a thread
@@ -127,6 +194,25 @@ Always provide professional, accurate, and detailed responses suitable for busin
             // Get assistant ID
             const assistantId = await this.getAssistantId();
             console.log(`Using assistant ID: ${assistantId}`);
+
+            // Clean up any existing active runs
+            await this.cleanupThreadRuns(threadId);
+
+            // Double-check for active runs after cleanup
+            try {
+                const existingRuns = await this.openai.beta.threads.runs.list(threadId);
+                const stillActiveRuns = existingRuns.data.filter(run =>
+                    run.status === 'queued' || run.status === 'in_progress'
+                );
+
+                if (stillActiveRuns.length > 0) {
+                    console.log(`⚠️ Still found ${stillActiveRuns.length} active runs after cleanup. Waiting...`);
+                    // Wait a bit more and try again
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+            } catch (checkError) {
+                console.log(`Could not check for remaining active runs:`, checkError.message);
+            }
 
             // Create a run to process the message with retry logic
             let run;
@@ -149,6 +235,9 @@ Always provide professional, accurate, and detailed responses suitable for busin
                         if (retryCount < maxRetries) {
                             console.log(`⏳ Waiting 5 seconds before retry ${retryCount + 1}/${maxRetries}...`);
                             await new Promise(resolve => setTimeout(resolve, 5000));
+
+                            // Try cleanup again before retry
+                            await this.cleanupThreadRuns(threadId);
                         } else {
                             console.error(`❌ Failed to create run after ${maxRetries} attempts`);
                             throw new Error(`Unable to create run: Thread ${threadId} has persistent active runs. Please try again later.`);
@@ -441,24 +530,98 @@ Always provide professional, accurate, and detailed responses suitable for busin
         const fileSizeInMB = stats.size / (1024 * 1024);
         const fileExtension = path.extname(fileName).toLowerCase();
 
-        // Use fs.createReadStream for all files (recommended by OpenAI)
-        return await this.uploadWithStream(filePath, fileName, timeout);
+        // For small files (< 10MB), use toFile helper
+        if (fileSizeInMB < 10) {
+            return await this.uploadSmallFile(filePath, fileName, timeout);
+        }
+
+        // For larger files, use fs.createReadStream
+        return await this.uploadLargeFile(filePath, fileName, chunkSize, timeout);
     }
 
-
     /**
-     * Upload file using fs.createReadStream (unified method)
+     * Alternative upload method using File API (for environments that support it)
      * @param {string} filePath - Path to the file
      * @param {string} fileName - Name of the file
      * @param {number} timeout - Request timeout
      * @returns {Promise<Object>} - Uploaded file object
      */
-    async uploadWithStream(filePath, fileName, timeout) {
+    async uploadWithFileAPI(filePath, fileName, timeout) {
+        const fs = require('fs').promises;
+
+        console.log(`📤 Uploading file using File API: ${fileName}`);
+
+        try {
+            // Read file as buffer
+            const fileBuffer = await fs.readFile(filePath);
+
+            // Create File object (if available in environment)
+            const file = new File([fileBuffer], fileName, {
+                type: this.getMimeType(fileName)
+            });
+
+            // Upload with timeout
+            const uploadPromise = this.openai.files.create({
+                file: file,
+                purpose: 'assistants'
+            });
+
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Upload timeout')), timeout);
+            });
+
+            return await Promise.race([uploadPromise, timeoutPromise]);
+
+        } catch (error) {
+            if (error.message.includes('File is not defined')) {
+                throw new Error('File API not available in this environment. Use uploadSmallFile or uploadLargeFile instead.');
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Upload small files directly using fs.createReadStream
+     * @param {string} filePath - Path to the file
+     * @param {string} fileName - Name of the file
+     * @param {number} timeout - Request timeout
+     * @returns {Promise<Object>} - Uploaded file object
+     */
+    async uploadSmallFile(filePath, fileName, timeout) {
         const fs = require('fs');
 
-        console.log(`📤 Uploading file using fs.createReadStream: ${fileName}`);
+        console.log(`📤 Uploading small file using fs.createReadStream: ${fileName}`);
 
         // Use fs.createReadStream as recommended by OpenAI for all files
+        const fileStream = fs.createReadStream(filePath);
+
+        // Upload with timeout
+        const uploadPromise = this.openai.files.create({
+            file: fileStream,
+            purpose: 'assistants'
+        });
+
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Upload timeout')), timeout);
+        });
+
+        return await Promise.race([uploadPromise, timeoutPromise]);
+    }
+
+    /**
+     * Upload large files using fs.createReadStream
+     * @param {string} filePath - Path to the file
+     * @param {string} fileName - Name of the file
+     * @param {number} chunkSize - Chunk size
+     * @param {number} timeout - Request timeout
+     * @returns {Promise<Object>} - Uploaded file object
+     */
+    async uploadLargeFile(filePath, fileName, chunkSize, timeout) {
+        const fs = require('fs');
+
+        console.log(`📤 Uploading large file using fs.createReadStream: ${fileName}`);
+
+        // Use fs.createReadStream as recommended by OpenAI
         const fileStream = fs.createReadStream(filePath);
 
         // Upload with timeout
@@ -809,6 +972,24 @@ Always provide professional, accurate, and detailed responses suitable for busin
             throw new Error(`Failed to list assistants: ${error.message}`);
         }
     }
+
+    /**
+     * Delete an assistant
+     * @param {string} assistantId - Assistant ID
+     * @returns {Promise<boolean>} - Success status
+     */
+    async deleteAssistant(assistantId) {
+        try {
+            await this.openai.beta.assistants.del(assistantId);
+            console.log(`Assistant ${assistantId} deleted successfully`);
+            return true;
+        } catch (error) {
+            console.error('Error deleting assistant:', error);
+            throw new Error(`Failed to delete assistant: ${error.message}`);
+        }
+    }
+
+
 
 }
 
