@@ -897,6 +897,16 @@ Always provide professional, accurate, and detailed responses suitable for busin
    - Required certifications and permits
    - Trade agreement applicability
 
+Follow these rules:
+  1. Extract key data: MRN, LRN, acceptance/release date, procedure code, importer/exporter/representative (EORI/NIP), CN/TARIC code, countries, Incoterm, mass, values, duty/VAT (rate/base/amount/payment method), documents, status.
+  2. Compare to invoice data: totals, dates, HSN, quantities, weights, and currencies.
+  3. Compute weighted match score:
+     - Parties 20%, Values 25%, HS/CN 20%, Weight 10%, Dates 10%, Duty/VAT 15%.
+  4. Validate CN 71131100 duty (2.5%) and VAT (23%) via TARIC/ISZTAR4.
+  5. Identify VAT route: Article 33a (deferred) if VAT method=G, or Normal if paid at border.
+  6. Flag top issues: mismatches, invalid IDs, wrong CN, rate differences, missing documents, procedure != 4000, status != ZWOLNIONA.
+  7. Produce the JSON strictly in this format.
+
 **Response Format Requirements:**
 Provide a comprehensive JSON response with the following structure:
 {
@@ -1054,7 +1064,8 @@ Provide a comprehensive JSON response with the following structure:
 - Highlight critical discrepancies that could cause customs delays or rejection
 - Suggest specific remediation steps for identified issues
 
-Focus on providing comprehensive customs validation that ensures accurate documentation and compliance readiness.`;
+Focus on providing comprehensive customs validation that ensures accurate documentation and compliance readiness.
+Return only valid JSON.`;
 
             // Prepare attachments array with available files
             const attachments = [];
