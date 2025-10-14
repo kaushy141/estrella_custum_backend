@@ -514,6 +514,206 @@ const controller = {
       );
     }
   },
+
+  // Download original invoice file by ID or GUID
+  downloadOriginalById: async function (req, res) {
+    try {
+      const { id } = req.params;
+      const groupId = req.groupId;
+      const isSuperAdmin = req.isSuperAdmin;
+      const { Op } = require("sequelize");
+      const path = require('path');
+
+      // Build where clause
+      let whereClause = {
+        [Op.or]: [
+          { guid: id }
+        ]
+      };
+
+      if (!isSuperAdmin) {
+        whereClause.groupId = groupId;
+      }
+
+      const invoice = await Invoice.findOne({
+        where: whereClause
+      });
+
+      if (!invoice) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Invoice not found",
+          null
+        );
+      }
+
+      if (!invoice.originalFilePath) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Original file not found for this invoice",
+          null
+        );
+      }
+
+      const fs = require('fs');
+      const filePath = invoice.originalFilePath;
+      const resolvedPath = path.resolve(filePath);
+
+      // Check if file exists
+      if (!fs.existsSync(resolvedPath)) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "File not found on server",
+          { filePath: filePath }
+        );
+      }
+
+      // Set headers for file download
+      const fileName = invoice.originalFileName || path.basename(filePath);
+      const ext = path.extname(fileName).toLowerCase();
+
+      // Set content type based on file extension
+      let contentType = 'application/octet-stream';
+      if (ext === '.pdf') contentType = 'application/pdf';
+      else if (ext === '.xlsx' || ext === '.xls') contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      else if (ext === '.doc' || ext === '.docx') contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      else if (ext === '.png') contentType = 'image/png';
+      else if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
+
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+      // Stream the file
+      const fileStream = fs.createReadStream(resolvedPath);
+      fileStream.pipe(res);
+
+      fileStream.on('error', (error) => {
+        console.error('Error streaming file:', error);
+        if (!res.headersSent) {
+          return sendResponseWithData(
+            res,
+            ErrorCode.REQUEST_FAILED,
+            "Error downloading file",
+            { error: error.message }
+          );
+        }
+      });
+
+    } catch (err) {
+      console.error('Error downloading original invoice:', err);
+      if (!res.headersSent) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.REQUEST_FAILED,
+          "Unable to download original invoice file",
+          { error: err.message }
+        );
+      }
+    }
+  },
+
+  // Download translated invoice file by ID or GUID
+  downloadTranslatedById: async function (req, res) {
+    try {
+      const { id } = req.params;
+      const groupId = req.groupId;
+      const isSuperAdmin = req.isSuperAdmin;
+      const { Op } = require("sequelize");
+      const path = require('path');
+
+      // Build where clause
+      let whereClause = {
+        [Op.or]: [
+          { guid: id }
+        ]
+      };
+
+      if (!isSuperAdmin) {
+        whereClause.groupId = groupId;
+      }
+
+      const invoice = await Invoice.findOne({
+        where: whereClause
+      });
+
+      if (!invoice) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Invoice not found",
+          null
+        );
+      }
+
+      if (!invoice.translatedFilePath) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Translated file not found for this invoice. Please ensure the invoice has been translated.",
+          null
+        );
+      }
+
+      const fs = require('fs');
+      const filePath = invoice.translatedFilePath;
+      const resolvedPath = path.resolve(filePath);
+
+      // Check if file exists
+      if (!fs.existsSync(resolvedPath)) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Translated file not found on server",
+          { filePath: filePath }
+        );
+      }
+
+      // Set headers for file download
+      const fileName = invoice.translatedFileName || path.basename(filePath);
+      const ext = path.extname(fileName).toLowerCase();
+
+      // Set content type based on file extension
+      let contentType = 'application/octet-stream';
+      if (ext === '.pdf') contentType = 'application/pdf';
+      else if (ext === '.xlsx' || ext === '.xls') contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      else if (ext === '.doc' || ext === '.docx') contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      else if (ext === '.png') contentType = 'image/png';
+      else if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
+
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+      // Stream the file
+      const fileStream = fs.createReadStream(resolvedPath);
+      fileStream.pipe(res);
+
+      fileStream.on('error', (error) => {
+        console.error('Error streaming file:', error);
+        if (!res.headersSent) {
+          return sendResponseWithData(
+            res,
+            ErrorCode.REQUEST_FAILED,
+            "Error downloading file",
+            { error: error.message }
+          );
+        }
+      });
+
+    } catch (err) {
+      console.error('Error downloading translated invoice:', err);
+      if (!res.headersSent) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.REQUEST_FAILED,
+          "Unable to download translated invoice file",
+          { error: err.message }
+        );
+      }
+    }
+  }
 };
 
 module.exports = controller;

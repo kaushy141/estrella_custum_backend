@@ -10,6 +10,12 @@ router.post("/", authenticateToken, uploadMiddleware("invoices").fields([{ name:
 // Get all invoices with pagination and filters
 router.get("/", authenticateToken, invoiceController.getAll);
 
+// Download original invoice file by ID or GUID
+router.get("/download/original/:id", authenticateToken, invoiceController.downloadOriginalById);
+
+// Download translated invoice file by ID or GUID
+router.get("/download/translated/:id", authenticateToken, invoiceController.downloadTranslatedById);
+
 // Get invoice by ID or GUID
 router.get("/:id", authenticateToken, invoiceController.getById);
 
