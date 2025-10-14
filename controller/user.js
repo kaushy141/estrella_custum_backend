@@ -82,6 +82,7 @@ const controller = {
       whereClause.groupId = groupId;
       if (isSuperAdmin) {
         _.omit(whereClause, "groupId");
+        whereClause = {};
       }
       if (isActive !== undefined) {
         whereClause.isActive = isActive === "true";

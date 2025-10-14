@@ -8,20 +8,20 @@ const controller = {
   create: async function (req, res) {
     try {
       const data = req.body;
-             const group = await Group.create(data);
-               // Log activity
-        try {
-          await activityHelper.logGroupCreation(group, req.userId || data.createdBy || 1);
-        } catch (activityError) {
-          console.error("Activity logging failed:", activityError);
-          // Don't fail the main operation if activity logging fails
-        }
-       
-       let responseData = {
-         status: "success",
-         data: group,
-       };
-      
+      const group = await Group.create(data);
+      // Log activity
+      try {
+        await activityHelper.logGroupCreation(group, req.userId || data.createdBy || 1);
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
+
+      let responseData = {
+        status: "success",
+        data: group,
+      };
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -43,25 +43,29 @@ const controller = {
     try {
       const { page = 1, limit = 10, isActive } = req.query;
       const offset = (page - 1) * limit;
-      
+
+      console.log("req.groupId", req.groupId);
+      console.log("req.isSuperAdmin", req.isSuperAdmin);
+
       let whereClause = {};
       const groupId = req.groupId;
       const isSuperAdmin = req.isSuperAdmin;
       whereClause.id = groupId;
       if (isSuperAdmin) {
         _.omit(whereClause, "id");
+        whereClause = {};
       }
       if (isActive !== undefined) {
         whereClause.isActive = isActive === 'true';
       }
-      console.log("whereClause",whereClause);
+      console.log("whereClause", whereClause);
       const groups = await Group.findAndCountAll({
         where: whereClause,
         limit: parseInt(limit),
         offset: parseInt(offset),
         order: [['createdAt', 'DESC']]
       });
-      
+
       let responseData = {
         status: "success",
         data: groups.rows,
@@ -69,7 +73,7 @@ const controller = {
         currentPage: parseInt(page),
         totalPages: Math.ceil(groups.count / limit)
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -90,7 +94,7 @@ const controller = {
   getById: async function (req, res) {
     try {
       const { id } = req.params;
-      
+
       const group = await Group.findOne({
         where: {
           $or: [
@@ -99,7 +103,7 @@ const controller = {
           ]
         }
       });
-      
+
       if (!group) {
         return sendResponseWithData(
           res,
@@ -108,12 +112,12 @@ const controller = {
           null
         );
       }
-      
+
       let responseData = {
         status: "success",
         data: group,
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -135,7 +139,7 @@ const controller = {
     try {
       const { id } = req.params;
       const data = req.body;
-      
+
       const group = await Group.findOne({
         where: {
           $or: [
@@ -144,7 +148,7 @@ const controller = {
           ]
         }
       });
-      
+
       if (!group) {
         return sendResponseWithData(
           res,
@@ -153,15 +157,15 @@ const controller = {
           null
         );
       }
-      
+
       await group.update(data);
       const updatedGroup = await group.save();
-      
+
       let responseData = {
         status: "success",
         data: updatedGroup,
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -182,7 +186,7 @@ const controller = {
   delete: async function (req, res) {
     try {
       const { id } = req.params;
-      
+
       const group = await Group.findOne({
         where: {
           $or: [
@@ -191,7 +195,7 @@ const controller = {
           ]
         }
       });
-      
+
       if (!group) {
         return sendResponseWithData(
           res,
@@ -200,14 +204,14 @@ const controller = {
           null
         );
       }
-      
+
       await group.destroy();
-      
+
       let responseData = {
         status: "success",
         message: "Group deleted successfully"
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -228,7 +232,7 @@ const controller = {
   deactivate: async function (req, res) {
     try {
       const { id } = req.params;
-      
+
       const group = await Group.findOne({
         where: {
           $or: [
@@ -237,7 +241,7 @@ const controller = {
           ]
         }
       });
-      
+
       if (!group) {
         return sendResponseWithData(
           res,
@@ -246,15 +250,15 @@ const controller = {
           null
         );
       }
-      
+
       await group.update({ isActive: false });
       const updatedGroup = await group.save();
-      
+
       let responseData = {
         status: "success",
         data: updatedGroup,
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -273,7 +277,7 @@ const controller = {
   activate: async function (req, res) {
     try {
       const { id } = req.params;
-      
+
       const group = await Group.findOne({
         where: {
           $or: [
@@ -282,7 +286,7 @@ const controller = {
           ]
         }
       });
-      
+
       if (!group) {
         return sendResponseWithData(
           res,
@@ -291,15 +295,15 @@ const controller = {
           null
         );
       }
-      
+
       await group.update({ isActive: true });
       const updatedGroup = await group.save();
-      
+
       let responseData = {
         status: "success",
         data: updatedGroup,
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,

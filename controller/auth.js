@@ -11,7 +11,7 @@ const controller = {
   login: async function (req, res) {
     try {
       const { email, password } = req.body;
-      
+
       // Validate required fields
       if (!email || !password) {
         return sendResponseWithData(
@@ -21,7 +21,7 @@ const controller = {
           null
         );
       }
-      
+
       // Find user by email
       const user = await User.findOne({
         where: { email: email },
@@ -29,12 +29,12 @@ const controller = {
           {
             model: Group,
             as: 'group',
-            attributes: ['id', 'name', 'logo', 'description','guid']
+            attributes: ['id', 'name', 'logo', 'description', 'guid']
           }
         ],
         attributes: { exclude: ['password'] }
       });
-      
+
       if (!user) {
         return sendResponseWithData(
           res,
@@ -43,7 +43,7 @@ const controller = {
           null
         );
       }
-      
+
       // Check if user is active
       if (user.isActive === false) {
         return sendResponseWithData(
@@ -53,10 +53,10 @@ const controller = {
           null
         );
       }
-      
+
       // Verify password
       const hashedPassword = crypto.createHash('sha256').update(password).digest('hex');
-      
+
       // Get user with password for verification
       const userWithPassword = await User.findOne({
         where: { email: email },
@@ -74,12 +74,12 @@ const controller = {
           );
         }
       }
-      
+
       // Generate JWT token
       const token = jwt.sign(
-        { 
-          userId: user.id, 
-          email: user.email, 
+        {
+          userId: user.id,
+          email: user.email,
           groupId: user.groupId,
           isAdmin: user.isAdmin,
           isSuperAdmin: user.isSuperAdmin,
@@ -93,26 +93,30 @@ const controller = {
         process.env.JWT_SECRET || 'your-secret-key',
         { expiresIn: '24h' }
       );
-      
-             // Store userId in session
-       req.session.userId = user.id;
-       req.session.userEmail = user.email;
-       req.session.groupId = user.groupId;
-       
-       // Log login activity
-       try {
-         await activityHelper.logActivity({
-           projectId: null,
-           groupId: user.groupId,
-           action: "USER_LOGIN",
-           description: `User ${user.firstName} ${user.lastName} ${user.isAdmin ? "(Admin)" : "(User)"} logged in successfully`,
-           createdBy: user.id // Use userId instead of email
-         });
-       } catch (activityError) {
-         console.error("Activity logging failed:", activityError);
-         // Don't fail the login if activity logging fails
-       }
-      
+
+      console.log("user in login", user);
+
+      // Store userId in session
+      req.session.userId = user.id;
+      req.session.userEmail = user.email;
+      req.session.groupId = user.groupId;
+      req.session.isSuperAdmin = user.isSuperAdmin;
+
+
+      // Log login activity
+      try {
+        await activityHelper.logActivity({
+          projectId: null,
+          groupId: user.groupId,
+          action: "USER_LOGIN",
+          description: `User ${user.firstName} ${user.lastName} ${user.isAdmin ? "(Admin)" : "(User)"} logged in successfully`,
+          createdBy: user.id // Use userId instead of email
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the login if activity logging fails
+      }
+
       // Prepare response data
       const responseData = {
         status: "success",
@@ -121,14 +125,14 @@ const controller = {
           user: user
         }
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
         "Login successful",
         responseData
       );
-      
+
     } catch (err) {
       console.error("Login error:", err);
       return sendResponseWithData(
@@ -144,7 +148,7 @@ const controller = {
   verifyToken: async function (req, res) {
     try {
       const token = req.headers.authorization?.replace('Bearer ', '');
-      
+
       if (!token) {
         return sendResponseWithData(
           res,
@@ -153,10 +157,10 @@ const controller = {
           null
         );
       }
-      
+
       // Verify JWT token
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-      
+
       // Get user data
       const user = await User.findOne({
         where: { id: decoded.userId },
@@ -169,7 +173,7 @@ const controller = {
         ],
         attributes: { exclude: ['password'] }
       });
-      
+
       if (!user) {
         return sendResponseWithData(
           res,
@@ -178,7 +182,7 @@ const controller = {
           null
         );
       }
-      
+
       // Check if user is still active
       if (user.isActive === false) {
         return sendResponseWithData(
@@ -188,7 +192,7 @@ const controller = {
           null
         );
       }
-      
+
       let responseData = {
         status: "success",
         data: {
@@ -196,14 +200,14 @@ const controller = {
           token: token
         }
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
         "Token verified successfully",
         responseData
       );
-      
+
     } catch (err) {
       if (err.name === 'JsonWebTokenError') {
         return sendResponseWithData(
@@ -220,7 +224,7 @@ const controller = {
           null
         );
       }
-      
+
       console.error("Token verification error:", err);
       return sendResponseWithData(
         res,
@@ -235,7 +239,7 @@ const controller = {
   logout: async function (req, res) {
     try {
       const token = req.headers.authorization?.replace('Bearer ', '');
-      
+
       if (!token) {
         return sendResponseWithData(
           res,
@@ -244,51 +248,51 @@ const controller = {
           null
         );
       }
-      
+
       // Decode token to get user info
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-      
+
       // Get user data for activity logging
       const user = await User.findOne({
         where: { id: decoded.userId },
         attributes: ['id', 'firstName', 'lastName', 'email', 'groupId']
       });
-      
-             if (user) {
-         // Log logout activity
-         try {
-           await activityHelper.logActivity({
-             projectId: null,
-             groupId: user.groupId,
-             action: "USER_LOGOUT",
-             description: `User ${user.firstName} ${user.lastName} logged out successfully`,
-             createdBy: user.id // Use userId instead of email
-           });
-         } catch (activityError) {
-           console.error("Activity logging failed:", activityError);
-           // Don't fail the logout if activity logging fails
-         }
-       }
-       
-       // Clear session
-       req.session.destroy((err) => {
-         if (err) {
-           console.error("Session destruction error:", err);
-         }
-       });
-      
+
+      if (user) {
+        // Log logout activity
+        try {
+          await activityHelper.logActivity({
+            projectId: null,
+            groupId: user.groupId,
+            action: "USER_LOGOUT",
+            description: `User ${user.firstName} ${user.lastName} logged out successfully`,
+            createdBy: user.id // Use userId instead of email
+          });
+        } catch (activityError) {
+          console.error("Activity logging failed:", activityError);
+          // Don't fail the logout if activity logging fails
+        }
+      }
+
+      // Clear session
+      req.session.destroy((err) => {
+        if (err) {
+          console.error("Session destruction error:", err);
+        }
+      });
+
       let responseData = {
         status: "success",
         message: "Logout successful"
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
         "Logout successful",
         responseData
       );
-      
+
     } catch (err) {
       console.error("Logout error:", err);
       return sendResponseWithData(
@@ -304,7 +308,7 @@ const controller = {
   refreshToken: async function (req, res) {
     try {
       const token = req.headers.authorization?.replace('Bearer ', '');
-      
+
       if (!token) {
         return sendResponseWithData(
           res,
@@ -313,10 +317,10 @@ const controller = {
           null
         );
       }
-      
+
       // Verify current token
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-      
+
       // Get user data
       const user = await User.findOne({
         where: { id: decoded.userId },
@@ -329,7 +333,7 @@ const controller = {
         ],
         attributes: { exclude: ['password'] }
       });
-      
+
       if (!user) {
         return sendResponseWithData(
           res,
@@ -338,7 +342,7 @@ const controller = {
           null
         );
       }
-      
+
       // Check if user is still active
       if (user.isActive === false) {
         return sendResponseWithData(
@@ -348,18 +352,18 @@ const controller = {
           null
         );
       }
-      
+
       // Generate new JWT token
       const newToken = jwt.sign(
-        { 
-          userId: user.id, 
-          email: user.email, 
-          groupId: user.groupId 
+        {
+          userId: user.id,
+          email: user.email,
+          groupId: user.groupId
         },
         process.env.JWT_SECRET || 'your-secret-key',
         { expiresIn: '24h' }
       );
-      
+
       let responseData = {
         status: "success",
         data: {
@@ -367,14 +371,14 @@ const controller = {
           user: user
         }
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
         "Token refreshed successfully",
         responseData
       );
-      
+
     } catch (err) {
       if (err.name === 'JsonWebTokenError') {
         return sendResponseWithData(
@@ -391,7 +395,7 @@ const controller = {
           null
         );
       }
-      
+
       console.error("Token refresh error:", err);
       return sendResponseWithData(
         res,
