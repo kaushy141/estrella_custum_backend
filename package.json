@@ -20,7 +20,9 @@
     "test-integration": "node scripts/test-complete-integration.js",
     "test-exceljs": "node scripts/exceljs-template-generator.js",
     "compare-excel": "node scripts/compare-excel-libraries.js",
-    "test-openai-json": "node scripts/test-openai-json-mapping.js"
+    "test-openai-json": "node scripts/test-openai-json-mapping.js",
+    "test-pz-generator": "node test-pz-generator.js",
+    "test-download-endpoints": "node test-download-endpoints.js"
   },
   "keywords": [
     "nodejs",
@@ -54,6 +56,7 @@
     "openai": "^5.23.1",
     "pdf-parse": "^1.1.1",
     "pdf2pic": "^3.2.0",
+    "pdfkit": "^0.15.0",
     "pg": "^8.11.3",
     "pg-hstore": "^2.3.4",
     "pm2": "^6.0.8",

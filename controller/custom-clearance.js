@@ -3,13 +3,17 @@ const { Project } = require("../models/project-model");
 const { Group } = require("../models/group-model");
 const { sendResponseWithData } = require("../helper/commonResponseHandler");
 const { SuccessCode, ErrorCode } = require("../helper/statusCode");
+const { Op } = require("sequelize");
+const pzDocumentGenerator = require("../services/pz-document-generator.service");
+const activityHelper = require("../helper/activityHelper");
 const _ = require("lodash");
+const path = require('path');
 const controller = {
   // Create new custom clearance
   create: async function (req, res) {
     try {
       const data = req.body;
-      
+
       // Verify project exists
       const project = await Project.findByPk(data.projectId);
       if (!project) {
@@ -20,7 +24,7 @@ const controller = {
           null
         );
       }
-      
+
       // Verify group exists
       const group = await Group.findByPk(data.groupId);
       if (!group) {
@@ -35,23 +39,23 @@ const controller = {
       if (req?.files && req?.files["files[]"]) {
         originalFilePath = req?.files["files[]"][0]?.path
       }
-      
-      data.originalFilePath = originalFilePath
-             const customClearance = await CustomClearance.create(data);
-       
-       // Log activity
-       try {
-         await activityHelper.logCustomClearanceCreation(customClearance, req.userId || data.createdBy || 1);
-       } catch (activityError) {
-         console.error("Activity logging failed:", activityError);
-         // Don't fail the main operation if activity logging fails
-       }
-       
-       let responseData = {
-         status: "success",
-         data: customClearance,
-       };
-      
+
+      //Generate AI PDF file for custom-clearance
+
+
+      // Log activity
+      try {
+        await activityHelper.logCustomClearanceCreation(customClearance, req.userId || data.createdBy || 1);
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
+
+      let responseData = {
+        status: "success",
+        data: customClearance,
+      };
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -99,7 +103,7 @@ const controller = {
         offset: parseInt(offset),
         order: [['createdAt', 'DESC']]
       });
-      
+
       let responseData = {
         status: "success",
         data: customClearances.rows,
@@ -107,7 +111,7 @@ const controller = {
         currentPage: parseInt(page),
         totalPages: Math.ceil(customClearances.count / limit)
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -128,7 +132,7 @@ const controller = {
   getById: async function (req, res) {
     try {
       const { id } = req.params;
-      
+
       const customClearance = await CustomClearance.findOne({
         where: {
           $or: [
@@ -149,7 +153,7 @@ const controller = {
           }
         ]
       });
-      
+
       if (!customClearance) {
         return sendResponseWithData(
           res,
@@ -158,12 +162,12 @@ const controller = {
           null
         );
       }
-      
+
       let responseData = {
         status: "success",
         data: customClearance,
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -185,7 +189,7 @@ const controller = {
     try {
       const { id } = req.params;
       const data = req.body;
-      
+
       const customClearance = await CustomClearance.findOne({
         where: {
           $or: [
@@ -194,7 +198,7 @@ const controller = {
           ]
         }
       });
-      
+
       if (!customClearance) {
         return sendResponseWithData(
           res,
@@ -203,7 +207,7 @@ const controller = {
           null
         );
       }
-      
+
       // Verify project exists if projectId is being updated
       if (data.projectId) {
         const project = await Project.findByPk(data.projectId);
@@ -216,7 +220,7 @@ const controller = {
           );
         }
       }
-      
+
       // Verify group exists if groupId is being updated
       if (data.groupId) {
         const group = await Group.findByPk(data.groupId);
@@ -229,15 +233,15 @@ const controller = {
           );
         }
       }
-      
+
       await customClearance.update(data);
       const updatedCustomClearance = await customClearance.save();
-      
+
       let responseData = {
         status: "success",
         data: updatedCustomClearance,
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -258,7 +262,7 @@ const controller = {
   delete: async function (req, res) {
     try {
       const { id } = req.params;
-      
+
       const customClearance = await CustomClearance.findOne({
         where: {
           $or: [
@@ -267,7 +271,7 @@ const controller = {
           ]
         }
       });
-      
+
       if (!customClearance) {
         return sendResponseWithData(
           res,
@@ -276,14 +280,14 @@ const controller = {
           null
         );
       }
-      
+
       await customClearance.destroy();
-      
+
       let responseData = {
         status: "success",
         message: "Custom clearance deleted successfully"
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -306,7 +310,7 @@ const controller = {
       const { projectId } = req.params;
       const { page = 1, limit = 10 } = req.query;
       const offset = (page - 1) * limit;
-      
+
       const customClearances = await CustomClearance.findAndCountAll({
         where: { projectId },
         include: [
@@ -320,7 +324,7 @@ const controller = {
         offset: parseInt(offset),
         order: [['createdAt', 'DESC']]
       });
-      
+
       let responseData = {
         status: "success",
         data: customClearances.rows,
@@ -328,7 +332,7 @@ const controller = {
         currentPage: parseInt(page),
         totalPages: Math.ceil(customClearances.count / limit)
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -351,7 +355,7 @@ const controller = {
       const { groupId } = req.params;
       const { page = 1, limit = 10 } = req.query;
       const offset = (page - 1) * limit;
-      
+
       const customClearances = await CustomClearance.findAndCountAll({
         where: { groupId },
         include: [
@@ -365,7 +369,7 @@ const controller = {
         offset: parseInt(offset),
         order: [['createdAt', 'DESC']]
       });
-      
+
       let responseData = {
         status: "success",
         data: customClearances.rows,
@@ -373,7 +377,7 @@ const controller = {
         currentPage: parseInt(page),
         totalPages: Math.ceil(customClearances.count / limit)
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -386,6 +390,316 @@ const controller = {
         ErrorCode.REQUEST_FAILED,
         "Unable to load custom clearances",
         err
+      );
+    }
+  },
+
+  // Download custom clearance document by projectId
+  downloadByProject: async function (req, res) {
+    try {
+      const { projectId } = req.params;
+      const { latest = 'false' } = req.query; // Get latest by default
+      const groupId = req.groupId;
+      const isSuperAdmin = req.isSuperAdmin;
+      console.log("projectId in downloadByProject", projectId);
+
+      if (!projectId) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.BAD_REQUEST,
+          "Project ID is required",
+          null
+        );
+      }
+
+      // Verify project exists
+      const project = await Project.findOne({ where: { guid: projectId } });
+      if (!project) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Project not found",
+          null
+        );
+      }
+
+      // Build where clause
+      let whereClause = { projectId: project.id };
+      if (!isSuperAdmin) {
+        whereClause.groupId = groupId;
+      }
+
+      // Fetch custom clearance documents
+      const customClearances = await CustomClearance.findAll({
+        where: whereClause,
+        order: [['createdAt', 'DESC']],
+        include: [
+          {
+            model: Project,
+            as: 'project',
+            attributes: ['id', 'title', 'status']
+          },
+          {
+            model: Group,
+            as: 'group',
+            attributes: ['id', 'name', 'logo']
+          }
+        ]
+      });
+
+      if (!customClearances || customClearances.length === 0) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "No custom clearance documents found for this project",
+          null
+        );
+      }
+
+      // If latest=true, download only the latest document
+      const documentToDownload = latest === 'true' ? customClearances[0] : customClearances;
+
+      if (latest === 'true') {
+        // Download single latest file
+        const filePath = documentToDownload.filePath;
+        const fs = require('fs');
+        const resolvedPath = path.resolve(filePath);
+
+        // Check if file exists
+        if (!fs.existsSync(resolvedPath)) {
+          return sendResponseWithData(
+            res,
+            ErrorCode.NOT_FOUND,
+            "File not found on server",
+            { filePath: filePath }
+          );
+        }
+
+        // Set headers for file download
+        const fileName = path.basename(filePath);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+        // Stream the file
+        const fileStream = fs.createReadStream(resolvedPath);
+        fileStream.pipe(res);
+
+        fileStream.on('error', (error) => {
+          console.error('Error streaming file:', error);
+          return sendResponseWithData(
+            res,
+            ErrorCode.REQUEST_FAILED,
+            "Error downloading file",
+            { error: error.message }
+          );
+        });
+
+      } else {
+        // Return list of all documents with download links
+        const documentsInfo = customClearances.map(doc => {
+          const fileName = path.basename(doc.filePath);
+          return {
+            id: doc.id,
+            guid: doc.guid,
+            filePath: doc.filePath,
+            fileName: fileName,
+            downloadUrl: `/api/custom-clearance/download/${doc.id}`,
+            createdAt: doc.createdAt,
+            project: doc.project,
+            group: doc.group
+          };
+        });
+
+        return sendResponseWithData(
+          res,
+          SuccessCode.SUCCESS,
+          "Custom clearance documents retrieved successfully",
+          {
+            status: "success",
+            count: documentsInfo.length,
+            documents: documentsInfo
+          }
+        );
+      }
+
+    } catch (err) {
+      console.error('Error downloading custom clearance:', err);
+      return sendResponseWithData(
+        res,
+        ErrorCode.REQUEST_FAILED,
+        "Unable to download custom clearance documents",
+        { error: err.message }
+      );
+    }
+  },
+
+  // Download custom clearance document by ID
+  downloadById: async function (req, res) {
+    try {
+      const { id } = req.params;
+      const groupId = req.groupId;
+      const isSuperAdmin = req.isSuperAdmin;
+
+      // Build where clause
+      let whereClause = {
+        [Op.or]: [
+          { guid: id }
+        ]
+      };
+
+      if (!isSuperAdmin) {
+        whereClause.groupId = groupId;
+      }
+
+      const customClearance = await CustomClearance.findOne({
+        where: whereClause
+      });
+
+      if (!customClearance) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Custom clearance document not found",
+          null
+        );
+      }
+
+      const fs = require('fs');
+      const filePath = customClearance.filePath;
+      const resolvedPath = path.resolve(filePath);
+
+      // Check if file exists
+      if (!fs.existsSync(resolvedPath)) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "File not found on server",
+          { filePath: filePath }
+        );
+      }
+
+      // Set headers for file download
+      const fileName = path.basename(filePath);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+      // Stream the file
+      const fileStream = fs.createReadStream(resolvedPath);
+      fileStream.pipe(res);
+
+      fileStream.on('error', (error) => {
+        console.error('Error streaming file:', error);
+        if (!res.headersSent) {
+          return sendResponseWithData(
+            res,
+            ErrorCode.REQUEST_FAILED,
+            "Error downloading file",
+            { error: error.message }
+          );
+        }
+      });
+
+    } catch (err) {
+      console.error('Error downloading custom clearance:', err);
+      if (!res.headersSent) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.REQUEST_FAILED,
+          "Unable to download custom clearance document",
+          { error: err.message }
+        );
+      }
+    }
+  },
+
+  // Generate PZ Document for a project
+  generatePZDocument: async function (req, res) {
+    try {
+      const { projectId, groupId } = req.body;
+      //const groupId = req.groupId;
+      const userId = req.userId || 1;
+
+      if (!projectId) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.BAD_REQUEST,
+          "Project ID is required",
+          null
+        );
+      }
+
+      console.log("projectId in generatePZDocument-", projectId);
+
+      // Verify project exists
+      const project = await Project.findOne({ where: { guid: projectId } });
+      if (!project) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Project not found.",
+          null
+        );
+      }
+
+      // Verify group exists
+      const group = await Group.findOne({ where: { guid: groupId } });
+      if (!group) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Group not found",
+          null
+        );
+      }
+
+      console.log(`Generating PZ document for project ${projectId}, group ${groupId}`);
+
+      // Generate PZ document
+      const pzDocumentData = await pzDocumentGenerator.generatePZDocument(project.id, group.id);
+
+      // Create CustomClearance record
+      const customClearance = await CustomClearance.create({
+        projectId: project.id,
+        groupId: group.id,
+        filePath: pzDocumentData.filePath,
+        fileContent: pzDocumentData.fileContent,
+        insights: pzDocumentData.insights,
+        openAIFileId: null // Not using OpenAI for PZ generation
+      });
+
+      console.log(`✅ CustomClearance record created with ID: ${customClearance.id}`);
+
+      // Log activity
+      try {
+        await activityHelper.logCustomClearanceCreation(customClearance, userId);
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
+
+      let responseData = {
+        status: "success",
+        data: {
+          customClearance: customClearance,
+          fileName: pzDocumentData.fileName,
+          filePath: pzDocumentData.filePath
+        },
+        message: "PZ document generated and saved successfully"
+      };
+
+      return sendResponseWithData(
+        res,
+        SuccessCode.SUCCESS,
+        "PZ document generated successfully",
+        responseData
+      );
+    } catch (err) {
+      console.error('Error generating PZ document:', err);
+      return sendResponseWithData(
+        res,
+        ErrorCode.REQUEST_FAILED,
+        err.message || "Unable to generate PZ document",
+        { error: err.message, stack: err.stack }
       );
     }
   }
