@@ -232,6 +232,14 @@ Always provide professional, accurate, and detailed responses suitable for busin
             }
 
             console.log(`Final run status: ${runStatus.status}`);
+
+            // Log detailed error information if run failed
+            if (runStatus.status === 'failed') {
+                console.error('❌ Run failed with detailed error information:');
+                console.error('Last error:', JSON.stringify(runStatus.last_error, null, 2));
+                console.error('Full run status:', JSON.stringify(runStatus, null, 2));
+            }
+
             return runStatus;
 
         } catch (error) {
@@ -1243,7 +1251,10 @@ Return only valid JSON.`;
             const runStatus = await this.waitForRunCompletion(threadId, run.id);
 
             if (runStatus.status !== 'completed') {
-                throw new Error(`Analysis run failed with status: ${runStatus.status}`);
+                const errorDetails = runStatus.last_error
+                    ? `${runStatus.last_error.code}: ${runStatus.last_error.message}`
+                    : 'No error details available';
+                throw new Error(`Analysis run failed with status: ${runStatus.status}. Details: ${errorDetails}`);
             }
 
             // Get response messages
@@ -1511,7 +1522,10 @@ Focus on providing comprehensive, detailed analysis that will help users underst
             const runStatus = await this.waitForRunCompletion(threadId, run.id);
 
             if (runStatus.status !== 'completed') {
-                throw new Error(`Analysis run failed with status: ${runStatus.status}`);
+                const errorDetails = runStatus.last_error
+                    ? `${runStatus.last_error.code}: ${runStatus.last_error.message}`
+                    : 'No error details available';
+                throw new Error(`Analysis run failed with status: ${runStatus.status}. Details: ${errorDetails}`);
             }
 
             // Get response messages
