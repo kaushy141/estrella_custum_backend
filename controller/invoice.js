@@ -479,7 +479,7 @@ const controller = {
         } catch (invoiceError) {
           console.error(`❌ Error processing invoice ${invoice.id}:`, invoiceError.message);
 
-          // Update invoice status to failed
+          // Update invoice status to failed 
           try {
             await invoice.update(
               {

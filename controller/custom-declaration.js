@@ -336,10 +336,9 @@ const controller = {
       const { id } = req.params;
 
       const customDeclaration = await CustomDeclaration.findOne({
-        where: {
-          $or: [{ id: id }, { guid: id }],
-        },
+        where: { guid: id },
       });
+
 
       if (!customDeclaration) {
         return sendResponseWithData(
@@ -377,11 +376,21 @@ const controller = {
   getByProject: async function (req, res) {
     try {
       const { projectId } = req.params;
-      const { page = 1, limit = 10 } = req.query;
+      const { page = 1, limit = 100 } = req.query;
       const offset = (page - 1) * limit;
 
+      console.log('projectId', projectId);
+      const project = await Project.findOne({ where: { guid: projectId } });
+      if (!project) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Project not found",
+          null
+        );
+      }
       const customDeclarations = await CustomDeclaration.findAndCountAll({
-        where: { projectId },
+        where: { projectId: project.id },
         include: [
           {
             model: Group,

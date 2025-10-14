@@ -752,23 +752,166 @@ Always provide professional, accurate, and detailed responses suitable for busin
 
 
     /**
+     * Check for and wait for any active runs on a thread
+     * @param {string} threadId - OpenAI thread ID
+     * @returns {Promise<void>}
+     */
+    async waitForActiveRuns(threadId) {
+        try {
+            console.log(`Checking for active runs on thread ${threadId}...`);
+
+            // List all runs for the thread
+            const runs = await this.openai.beta.threads.runs.list(threadId);
+
+            // Find any active runs
+            const activeRuns = runs.data.filter(run =>
+                run.status === 'queued' ||
+                run.status === 'in_progress' ||
+                run.status === 'requires_action'
+            );
+
+            if (activeRuns.length > 0) {
+                console.log(`Found ${activeRuns.length} active run(s). Waiting for completion...`);
+
+                // Wait for each active run to complete
+                for (const run of activeRuns) {
+                    console.log(`Waiting for run ${run.id} (status: ${run.status})...`);
+                    await this.waitForRunCompletion(threadId, run.id);
+                }
+
+                console.log('All active runs completed');
+            } else {
+                console.log('No active runs found');
+            }
+        } catch (error) {
+            console.error('Error checking for active runs:', error);
+            // Don't throw error here - we'll let the message creation attempt proceed
+            // If there's still an active run, the create message call will fail with a proper error
+        }
+    }
+
+    /**
+     * Validate file attachments and check if they're still usable
+     * @param {Array} attachments - File attachments array
+     * @returns {Promise<Object>} - Validation result with valid attachments
+     */
+    async validateFileAttachments(attachments) {
+        if (!attachments || attachments.length === 0) {
+            return { valid: true, attachments: [], warnings: [] };
+        }
+
+        const validAttachments = [];
+        const warnings = [];
+
+        for (const attachment of attachments) {
+            try {
+                // Check if file still exists and is accessible
+                const fileStatus = await this.getFileStatus(attachment.file_id);
+
+                if (fileStatus.isReady) {
+                    validAttachments.push(attachment);
+                } else {
+                    warnings.push(`File ${attachment.file_id} is not ready (status: ${fileStatus.status})`);
+                }
+            } catch (error) {
+                // If file doesn't exist or can't be retrieved, log warning
+                console.warn(`⚠️  File ${attachment.file_id} validation failed: ${error.message}`);
+                warnings.push(`File ${attachment.file_id} is no longer accessible: ${error.message}`);
+            }
+        }
+
+        return {
+            valid: validAttachments.length > 0,
+            attachments: validAttachments,
+            warnings: warnings
+        };
+    }
+
+    /**
      * Add message to thread with attachments
      * @param {string} threadId - OpenAI thread ID
      * @param {string} content - Message content
      * @param {Array} attachments - File attachments
+     * @param {Object} options - Additional options
      */
-    async addMessageToThread(threadId, content, attachments = []) {
+    async addMessageToThread(threadId, content, attachments = [], options = {}) {
         try {
+            // Wait for any active runs to complete before adding message
+            await this.waitForActiveRuns(threadId);
+
+            // Validate file attachments if enabled (default: false for backward compatibility)
+            let validatedAttachments = attachments;
+            if (options.validateFiles && attachments.length > 0) {
+                const validation = await this.validateFileAttachments(attachments);
+
+                if (validation.warnings.length > 0) {
+                    console.warn('⚠️  File validation warnings:', validation.warnings);
+                }
+
+                validatedAttachments = validation.attachments;
+
+                if (validatedAttachments.length === 0 && attachments.length > 0) {
+                    console.warn('⚠️  All file attachments failed validation. Proceeding without attachments.');
+                }
+            }
+
             await this.openai.beta.threads.messages.create(threadId, {
                 role: 'user',
                 content: content,
-                attachments: attachments
+                attachments: validatedAttachments
             });
 
-            console.log(`Message added to thread ${threadId}`);
+            console.log(`Message added to thread ${threadId} with ${validatedAttachments.length} attachment(s)`);
 
         } catch (error) {
             console.error('Error adding message to thread:', error);
+
+            // Check if error is due to expired vector store
+            if (error.code === 'expired' || (error.message && error.message.includes('expired') && error.message.includes('vector store'))) {
+                console.warn('⚠️  Vector store expired. Attempting recovery...');
+
+                // Try multiple recovery strategies
+                const strategies = [
+                    // Strategy 1: Remove file_search tool but keep attachments
+                    () => {
+                        console.log('Strategy 1: Retrying without file_search tool...');
+                        const attachmentsWithoutSearch = attachments.map(att => ({
+                            file_id: att.file_id,
+                            tools: [] // Remove file_search tool
+                        }));
+                        return this.openai.beta.threads.messages.create(threadId, {
+                            role: 'user',
+                            content: content,
+                            attachments: attachmentsWithoutSearch
+                        });
+                    },
+                    // Strategy 2: Try without any attachments
+                    () => {
+                        console.log('Strategy 2: Retrying without attachments...');
+                        return this.openai.beta.threads.messages.create(threadId, {
+                            role: 'user',
+                            content: content + '\n\n[Note: File attachments were removed due to expired vector store]',
+                            attachments: []
+                        });
+                    }
+                ];
+
+                // Try each strategy
+                for (let i = 0; i < strategies.length; i++) {
+                    try {
+                        await strategies[i]();
+                        console.log(`✅ Message added successfully using recovery strategy ${i + 1}`);
+                        return; // Success
+                    } catch (strategyError) {
+                        console.warn(`Strategy ${i + 1} failed:`, strategyError.message);
+                        if (i === strategies.length - 1) {
+                            // Last strategy failed
+                            throw new Error(`All recovery strategies failed for expired vector store. The files need to be re-uploaded. Original error: ${error.message}`);
+                        }
+                        // Continue to next strategy
+                    }
+                }
+            }
 
             // Provide more specific error messages for common issues
             if (error.code === 'unsupported_file') {
