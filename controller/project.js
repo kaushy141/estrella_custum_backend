@@ -188,6 +188,21 @@ const controller = {
       }
       await project.update(data);
       const updatedProject = await project.save();
+
+      // Log update activity
+      try {
+        await activityHelper.logActivity({
+          projectId: project.id,
+          groupId: project.groupId,
+          action: "PROJECT_UPDATED",
+          description: `Project "${project.title}" was updated`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
+
       let responseData = {
         status: "success",
         data: updatedProject,
@@ -222,6 +237,21 @@ const controller = {
       }
       await project.update({ status });
       const updatedProject = await project.save();
+
+      // Log status update activity
+      try {
+        await activityHelper.logActivity({
+          projectId: project.id,
+          groupId: project.groupId,
+          action: "PROJECT_STATUS_UPDATED",
+          description: `Project "${project.title}" status updated to "${status}"`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
+
       let responseData = {
         status: "success",
         data: updatedProject,
@@ -256,6 +286,20 @@ const controller = {
           "Project not found",
           null
         );
+      }
+
+      // Log deletion activity before destroying
+      try {
+        await activityHelper.logActivity({
+          projectId: project.id,
+          groupId: project.groupId,
+          action: "PROJECT_DELETED",
+          description: `Project "${project.title}" was deleted`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
       }
 
       await project.destroy();

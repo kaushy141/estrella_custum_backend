@@ -226,6 +226,20 @@ const controller = {
       const userResponse = updatedUser.toJSON();
       delete userResponse.password;
 
+      // Log update activity
+      try {
+        await activityHelper.logActivity({
+          projectId: null,
+          groupId: user.groupId,
+          action: "USER_UPDATED",
+          description: `User ${user.firstName} ${user.lastName} (${user.email}) was updated`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
+
       let responseData = {
         status: "success",
         data: userResponse,
@@ -265,6 +279,20 @@ const controller = {
           "User not found",
           null
         );
+      }
+
+      // Log deletion activity before destroying
+      try {
+        await activityHelper.logActivity({
+          projectId: null,
+          groupId: user.groupId,
+          action: "USER_DELETED",
+          description: `User ${user.firstName} ${user.lastName} (${user.email}) was deleted`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
       }
 
       await user.destroy();

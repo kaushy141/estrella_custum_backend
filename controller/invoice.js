@@ -266,6 +266,20 @@ const controller = {
       await invoice.update(data);
       const updatedInvoice = await invoice.save();
 
+      // Log update activity
+      try {
+        await activityHelper.logActivity({
+          projectId: invoice.projectId,
+          groupId: invoice.groupId,
+          action: "INVOICE_UPDATED",
+          description: `Invoice updated for project ID: ${invoice.projectId}`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
+
       let responseData = {
         status: "success",
         data: updatedInvoice,
@@ -305,6 +319,20 @@ const controller = {
           "Invoice not found",
           null
         );
+      }
+
+      // Log deletion activity before destroying
+      try {
+        await activityHelper.logActivity({
+          projectId: invoice.projectId,
+          groupId: invoice.groupId,
+          action: "INVOICE_DELETED",
+          description: `Invoice deleted for project ID: ${invoice.projectId}`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
       }
 
       await invoice.destroy();

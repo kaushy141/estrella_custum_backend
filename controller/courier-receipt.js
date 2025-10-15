@@ -261,6 +261,20 @@ const controller = {
       await courierReceipt.update(data);
       const updatedCourierReceipt = await courierReceipt.save();
 
+      // Log update activity
+      try {
+        await activityHelper.logActivity({
+          projectId: courierReceipt.projectId,
+          groupId: courierReceipt.groupId,
+          action: "COURIER_RECEIPT_UPDATED",
+          description: `Courier receipt updated for project ID: ${courierReceipt.projectId}`,
+          createdBy: req.userId || data.createdBy || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
+
       let responseData = {
         status: "success",
         data: updatedCourierReceipt,
@@ -289,7 +303,7 @@ const controller = {
 
       const courierReceipt = await CourierReceipt.findOne({
         where: {
-          [Op.or]: [{ id: id }, { guid: id }],
+          [Op.or]: [{ guid: id }],
         },
       });
 
@@ -300,6 +314,20 @@ const controller = {
           "Courier receipt not found",
           null
         );
+      }
+
+      // Log deletion activity before destroying
+      try {
+        await activityHelper.logActivity({
+          projectId: courierReceipt.projectId,
+          groupId: courierReceipt.groupId,
+          action: "COURIER_RECEIPT_DELETED",
+          description: `Courier receipt deleted for project ID: ${courierReceipt.projectId}`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
       }
 
       await courierReceipt.destroy();
@@ -466,6 +494,20 @@ const controller = {
 
       // Update courier receipt status to processing
       await courierReceipt.update({ status: "processing" });
+
+      // Log analysis activity
+      try {
+        await activityHelper.logActivity({
+          projectId: project.id,
+          groupId: project.groupId,
+          action: "COURIER_RECEIPT_ANALYSIS_STARTED",
+          description: `Courier receipt analysis started for project "${project.title}"`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
 
       // Start analysis in background
       const analysisPromise = openAIHelper.analyzeCourierReceiptDocument(project, courierReceipt);

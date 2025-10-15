@@ -1,0 +1,148 @@
+═══════════════════════════════════════════════════════════════════
+  PZ DOCUMENT GENERATOR - QUICK START GUIDE
+═══════════════════════════════════════════════════════════════════
+
+This guide will help you install and use the PZ Document Generator
+in 5 simple steps.
+
+═══════════════════════════════════════════════════════════════════
+  STEP 1: Install Dependencies
+═══════════════════════════════════════════════════════════════════
+
+Run this command in your terminal:
+
+    npm install pdfkit
+
+Or install all dependencies:
+
+    npm install
+
+═══════════════════════════════════════════════════════════════════
+  STEP 2: Create Media Directory
+═══════════════════════════════════════════════════════════════════
+
+Windows (PowerShell):
+    New-Item -ItemType Directory -Force -Path media\declaration
+
+Linux/Mac:
+    mkdir -p media/declaration
+    chmod 755 media/declaration
+
+═══════════════════════════════════════════════════════════════════
+  STEP 3: Test the Installation (Optional)
+═══════════════════════════════════════════════════════════════════
+
+Before testing, edit test-pz-generator.js:
+- Set TEST_PROJECT_ID to a valid project ID
+- Set TEST_GROUP_ID to a valid group ID
+
+Then run:
+
+    npm run test-pz-generator
+
+═══════════════════════════════════════════════════════════════════
+  STEP 4: Start the Server
+═══════════════════════════════════════════════════════════════════
+
+Start your server:
+
+    npm start
+
+Or for development:
+
+    npm run dev
+
+═══════════════════════════════════════════════════════════════════
+  STEP 5: Generate Your First PZ Document
+═══════════════════════════════════════════════════════════════════
+
+Use this API endpoint:
+
+    POST http://localhost:3000/api/custom-clearance/generate-pz
+
+Example using cURL:
+
+    curl -X POST http://localhost:3000/api/custom-clearance/generate-pz \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+      -d "{\"projectId\": 1}"
+
+Example using Postman:
+    1. Method: POST
+    2. URL: http://localhost:3000/api/custom-clearance/generate-pz
+    3. Headers:
+       - Authorization: Bearer YOUR_JWT_TOKEN
+       - Content-Type: application/json
+    4. Body (raw JSON):
+       {
+         "projectId": 1
+       }
+
+═══════════════════════════════════════════════════════════════════
+  WHAT YOU NEED BEFORE GENERATING
+═══════════════════════════════════════════════════════════════════
+
+✓ A valid project ID
+✓ At least one invoice for that project
+✓ At least one custom declaration for that project
+✓ A valid JWT authentication token
+✓ Access to the project's group
+
+═══════════════════════════════════════════════════════════════════
+  WHERE TO FIND YOUR GENERATED PDF
+═══════════════════════════════════════════════════════════════════
+
+The PDF will be saved at:
+
+    media/declaration/{first-char-of-guid}/PZ-{project-name}-{timestamp}.pdf
+
+Example:
+
+    media/declaration/5/PZ-Import_Electronics-2025-10-14T12-30-45.pdf
+
+The API response will include the exact file path.
+
+═══════════════════════════════════════════════════════════════════
+  DOCUMENTATION FILES
+═══════════════════════════════════════════════════════════════════
+
+For more information, check these files:
+
+  PZ_IMPLEMENTATION_SUMMARY.md  - Complete implementation details
+  PZ_DOCUMENT_GENERATOR.md      - API documentation and usage
+  SETUP_PZ_GENERATOR.md         - Detailed setup instructions
+
+═══════════════════════════════════════════════════════════════════
+  TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════
+
+Problem: "pdfkit module not found"
+Solution: Run: npm install pdfkit
+
+Problem: "No invoices found for project"
+Solution: Upload at least one invoice for the project
+
+Problem: "No custom declaration found for project"
+Solution: Upload a custom declaration document for the project
+
+Problem: "Permission denied" when creating file
+Solution: Ensure media/declaration directory exists and is writable
+
+Problem: "Project not found"
+Solution: Verify the project ID exists and you have access
+
+═══════════════════════════════════════════════════════════════════
+  NEED HELP?
+═══════════════════════════════════════════════════════════════════
+
+1. Check server logs for detailed error messages
+2. Review PZ_DOCUMENT_GENERATOR.md for complete documentation
+3. Run test script: npm run test-pz-generator
+4. Verify prerequisites are met (see checklist above)
+
+═══════════════════════════════════════════════════════════════════
+
+That's it! You're ready to generate PZ documents. 🚀
+
+═══════════════════════════════════════════════════════════════════
+

@@ -4,6 +4,7 @@ const { sendResponseWithData } = require("../helper/commonResponseHandler");
 const { SuccessCode, ErrorCode } = require("../helper/statusCode");
 const _ = require("lodash");
 const { User } = require("../models/user-model");
+const activityHelper = require("../helper/activityHelper");
 const controller = {
   // Create new custom agent
   create: async function (req, res) {
@@ -23,6 +24,18 @@ const controller = {
       }
       data.groupId = group.id;
       const customAgent = await CustomAgent.create(data);
+
+      // Log creation activity
+      try {
+        await activityHelper.logCustomAgentCreation(
+          customAgent,
+          userId
+        );
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
+
       let responseData = {
         status: "success",
         data: customAgent,
@@ -183,6 +196,20 @@ const controller = {
       await customAgent.update(data);
       const updatedCustomAgent = await customAgent.save();
 
+      // Log update activity
+      try {
+        await activityHelper.logActivity({
+          projectId: null,
+          groupId: customAgent.groupId,
+          action: "CUSTOM_AGENT_UPDATED",
+          description: `Custom agent "${customAgent.name}" was updated`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
+
       let responseData = {
         status: "success",
         data: updatedCustomAgent,
@@ -222,6 +249,20 @@ const controller = {
           "Custom agent not found",
           null
         );
+      }
+
+      // Log deletion activity before destroying
+      try {
+        await activityHelper.logActivity({
+          projectId: null,
+          groupId: customAgent.groupId,
+          action: "CUSTOM_AGENT_DELETED",
+          description: `Custom agent "${customAgent.name}" was deleted`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
       }
 
       await customAgent.destroy();
@@ -294,6 +335,21 @@ const controller = {
   sendToCustomAgent: async function (req, res) {
     try {
       const { data } = req.body;
+
+      // Log send activity
+      try {
+        await activityHelper.logActivity({
+          projectId: null,
+          groupId: req.groupId,
+          action: "CUSTOM_AGENT_MESSAGE_SENT",
+          description: `Message sent to custom agent`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
+
       let responseData = {
         status: "success",
         message: "Custom agent sent successfully",

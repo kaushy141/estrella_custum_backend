@@ -161,6 +161,20 @@ const controller = {
       await group.update(data);
       const updatedGroup = await group.save();
 
+      // Log update activity
+      try {
+        await activityHelper.logActivity({
+          projectId: null,
+          groupId: group.id,
+          action: "GROUP_UPDATED",
+          description: `Group "${group.name}" was updated`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
+
       let responseData = {
         status: "success",
         data: updatedGroup,
@@ -203,6 +217,20 @@ const controller = {
           "Group not found",
           null
         );
+      }
+
+      // Log deletion activity before destroying
+      try {
+        await activityHelper.logActivity({
+          projectId: null,
+          groupId: group.id,
+          action: "GROUP_DELETED",
+          description: `Group "${group.name}" was deleted`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
       }
 
       await group.destroy();

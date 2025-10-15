@@ -28,7 +28,7 @@ const controller = {
       const shippingService = await ShippingService.create(data);
       // Log activity
       try {
-        // await activityHelper.logShippingServiceCreation(shippingService, req.userId || data.createdBy || 1);
+        await activityHelper.logShippingServiceCreation(shippingService, req.userId || data.createdBy || 1);
       } catch (activityError) {
         console.error("Activity logging failed:", activityError);
         // Don't fail the main operation if activity logging fails
@@ -262,6 +262,20 @@ const controller = {
       await shippingService.update(data);
       const updatedShippingService = await shippingService.save();
 
+      // Log update activity
+      try {
+        await activityHelper.logActivity({
+          projectId: null,
+          groupId: shippingService.groupId,
+          action: "SHIPPING_SERVICE_UPDATED",
+          description: `Shipping service "${shippingService.name}" was updated`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
+
       let responseData = {
         status: "success",
         data: updatedShippingService,
@@ -304,6 +318,20 @@ const controller = {
           "Shipping service not found",
           null
         );
+      }
+
+      // Log deletion activity before destroying
+      try {
+        await activityHelper.logActivity({
+          projectId: null,
+          groupId: shippingService.groupId,
+          action: "SHIPPING_SERVICE_DELETED",
+          description: `Shipping service "${shippingService.name}" was deleted`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
       }
 
       await shippingService.destroy();

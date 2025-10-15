@@ -42,6 +42,7 @@ const controller = {
 
       //Generate AI PDF file for custom-clearance
 
+      const customClearance = await CustomClearance.create(data);
 
       // Log activity
       try {
@@ -237,6 +238,20 @@ const controller = {
       await customClearance.update(data);
       const updatedCustomClearance = await customClearance.save();
 
+      // Log update activity
+      try {
+        await activityHelper.logActivity({
+          projectId: customClearance.projectId,
+          groupId: customClearance.groupId,
+          action: "CUSTOM_CLEARANCE_UPDATED",
+          description: `Custom clearance updated for project ID: ${customClearance.projectId}`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
+
       let responseData = {
         status: "success",
         data: updatedCustomClearance,
@@ -266,7 +281,6 @@ const controller = {
       const customClearance = await CustomClearance.findOne({
         where: {
           $or: [
-            { id: id },
             { guid: id }
           ]
         }
@@ -279,6 +293,20 @@ const controller = {
           "Custom clearance not found",
           null
         );
+      }
+
+      // Log deletion activity before destroying
+      try {
+        await activityHelper.logActivity({
+          projectId: customClearance.projectId,
+          groupId: customClearance.groupId,
+          action: "CUSTOM_CLEARANCE_DELETED",
+          description: `Custom clearance deleted for project ID: ${customClearance.projectId}`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
       }
 
       await customClearance.destroy();

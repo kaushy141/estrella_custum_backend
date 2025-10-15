@@ -364,6 +364,20 @@ const controller = {
         { expiresIn: '24h' }
       );
 
+      // Log token refresh activity
+      try {
+        await activityHelper.logActivity({
+          projectId: null,
+          groupId: user.groupId,
+          action: "TOKEN_REFRESHED",
+          description: `User ${user.firstName} ${user.lastName} refreshed their authentication token`,
+          createdBy: user.id
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the refresh if activity logging fails
+      }
+
       let responseData = {
         status: "success",
         data: {

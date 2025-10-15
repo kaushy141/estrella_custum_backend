@@ -13,10 +13,10 @@ const activityHelper = {
    * @param {number} data.createdBy - User ID who performed the action
    * @returns {Promise<Object>} Created activity log
    */
-  logActivity: async function(data) {
+  logActivity: async function (data) {
     try {
       // Validate required fields
-      if ( !data.groupId || !data.action || !data.description || !data.createdBy) {
+      if (!data.groupId || !data.action || !data.description || !data.createdBy) {
         throw new Error("Missing required fields for activity logging");
       }
 
@@ -56,7 +56,7 @@ const activityHelper = {
    * @param {number} createdBy - User ID who created the user
    * @returns {Promise<Object>} Created activity log
    */
-  logUserCreation: async function(userData, createdBy) {
+  logUserCreation: async function (userData, createdBy) {
     return await this.logActivity({
       projectId: null, // Default project if not specified
       groupId: userData.groupId,
@@ -72,7 +72,7 @@ const activityHelper = {
    * @param {number} createdBy - User ID who created the group
    * @returns {Promise<Object>} Created activity log
    */
-  logGroupCreation: async function(groupData, createdBy) {
+  logGroupCreation: async function (groupData, createdBy) {
     return await this.logActivity({
       projectId: null, // Default project for group operations
       groupId: groupData.id,
@@ -88,14 +88,14 @@ const activityHelper = {
    * @param {number} createdBy - User ID who created the project
    * @returns {Promise<Object>} Created activity log
    */
-  logProjectCreation: async function(projectData, createdBy) {
+  logProjectCreation: async function (projectData, createdBy) {
     return await this.logActivity({
       projectId: projectData.id,
       groupId: projectData.groupId,
       action: "PROJECT_CREATED",
       description: `Project "${projectData.title}" was created`,
       createdBy: createdBy
-      });
+    });
   },
 
   /**
@@ -104,7 +104,7 @@ const activityHelper = {
    * @param {number} createdBy - User ID who created the invoice
    * @returns {Promise<Object>} Created activity log
    */
-  logInvoiceCreation: async function(invoiceData, createdBy) {
+  logInvoiceCreation: async function (invoiceData, createdBy) {
     return await this.logActivity({
       projectId: invoiceData.projectId,
       groupId: invoiceData.groupId,
@@ -120,7 +120,7 @@ const activityHelper = {
    * @param {number} createdBy - User ID who created the service
    * @returns {Promise<Object>} Created activity log
    */
-  logShippingServiceCreation: async function(serviceData, createdBy) {
+  logShippingServiceCreation: async function (serviceData, createdBy) {
     return await this.logActivity({
       projectId: null, // Default project for service operations
       groupId: serviceData.groupId,
@@ -136,7 +136,7 @@ const activityHelper = {
    * @param {number} createdBy - User ID who created the agent
    * @returns {Promise<Object>} Created activity log
    */
-  logCustomAgentCreation: async function(agentData, createdBy) {
+  logCustomAgentCreation: async function (agentData, createdBy) {
     return await this.logActivity({
       projectId: null, // Default project for agent operations
       groupId: agentData.groupId,
@@ -152,7 +152,7 @@ const activityHelper = {
    * @param {number} createdBy - User ID who created the clearance
    * @returns {Promise<Object>} Created activity log
    */
-  logCustomClearanceCreation: async function(clearanceData, createdBy) {
+  logCustomClearanceCreation: async function (clearanceData, createdBy) {
     return await this.logActivity({
       projectId: clearanceData.projectId,
       groupId: clearanceData.groupId,
@@ -168,7 +168,7 @@ const activityHelper = {
    * @param {number} createdBy - User ID who created the declaration
    * @returns {Promise<Object>} Created activity log
    */
-  logCustomDeclarationCreation: async function(declarationData, createdBy) {
+  logCustomDeclarationCreation: async function (declarationData, createdBy) {
     return await this.logActivity({
       projectId: declarationData.projectId,
       groupId: declarationData.groupId,
@@ -184,7 +184,7 @@ const activityHelper = {
    * @param {number} createdBy - User ID who created the receipt
    * @returns {Promise<Object>} Created activity log
    */
-  logCourierReceiptCreation: async function(receiptData, createdBy) {
+  logCourierReceiptCreation: async function (receiptData, createdBy) {
     return await this.logActivity({
       projectId: receiptData.projectId,
       groupId: receiptData.groupId,
@@ -200,12 +200,50 @@ const activityHelper = {
    * @param {number} createdBy - User ID who created the address
    * @returns {Promise<Object>} Created activity log
    */
-  logGroupAddressCreation: async function(addressData, createdBy) {
+  logGroupAddressCreation: async function (addressData, createdBy) {
     return await this.logActivity({
       projectId: 1, // Default project for address operations
       groupId: addressData.groupId,
       action: "GROUP_ADDRESS_CREATED",
       description: `Group address was created for group ID: ${addressData.groupId}`,
+      createdBy: createdBy
+    });
+  },
+
+  /**
+   * Log project insight email sent activity
+   * @param {number} projectId - Project ID
+   * @param {string} subject - Email subject
+   * @param {number} successfulCount - Number of successful emails
+   * @param {number} failedCount - Number of failed emails
+   * @param {number} createdBy - User ID who sent the emails
+   * @returns {Promise<Object>} Created activity log
+   */
+  logProjectInsightEmailSent: async function (projectId, subject, successfulCount, failedCount, createdBy) {
+    return await this.logActivity({
+      projectId: projectId,
+      groupId: null, // Will be determined from project
+      action: "PROJECT_INSIGHTS_EMAIL_SENT",
+      description: `Project insights email "${subject}" sent: ${successfulCount} successful, ${failedCount} failed`,
+      createdBy: createdBy
+    });
+  },
+
+  /**
+   * Log custom declaration insight email sent activity
+   * @param {number} projectId - Project ID
+   * @param {string} subject - Email subject
+   * @param {number} successfulCount - Number of successful emails
+   * @param {number} failedCount - Number of failed emails
+   * @param {number} createdBy - User ID who sent the emails
+   * @returns {Promise<Object>} Created activity log
+   */
+  logCustomDeclarationInsightEmailSent: async function (projectId, subject, successfulCount, failedCount, createdBy) {
+    return await this.logActivity({
+      projectId: projectId,
+      groupId: null, // Will be determined from project
+      action: "CUSTOM_DECLARATION_INSIGHTS_EMAIL_SENT",
+      description: `Custom declaration insights email "${subject}" sent: ${successfulCount} successful, ${failedCount} failed`,
       createdBy: createdBy
     });
   }

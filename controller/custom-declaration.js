@@ -309,6 +309,20 @@ const controller = {
       await customDeclaration.update(data);
       const updatedCustomDeclaration = await customDeclaration.save();
 
+      // Log update activity
+      try {
+        await activityHelper.logActivity({
+          projectId: customDeclaration.projectId,
+          groupId: customDeclaration.groupId,
+          action: "CUSTOM_DECLARATION_UPDATED",
+          description: `Custom declaration updated for project ID: ${customDeclaration.projectId}`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
+
       let responseData = {
         status: "success",
         data: updatedCustomDeclaration,
@@ -347,6 +361,20 @@ const controller = {
           "Custom declaration not found",
           null
         );
+      }
+
+      // Log deletion activity before destroying
+      try {
+        await activityHelper.logActivity({
+          projectId: customDeclaration.projectId,
+          groupId: customDeclaration.groupId,
+          action: "CUSTOM_DECLARATION_DELETED",
+          description: `Custom declaration deleted for project ID: ${customDeclaration.projectId}`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
       }
 
       await customDeclaration.destroy();
@@ -511,6 +539,20 @@ const controller = {
 
       // Use the reusable analysis function
       const result = await controller.analyzeCustomDeclaration(customDeclaration, project, invoices);
+
+      // Log analysis activity
+      try {
+        await activityHelper.logActivity({
+          projectId: project.id,
+          groupId: project.groupId,
+          action: "CUSTOM_DECLARATION_ANALYSIS_STARTED",
+          description: `Custom declaration analysis started for project "${project.title}"`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
 
       return sendResponseWithData(
         res,

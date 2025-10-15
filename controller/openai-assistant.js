@@ -6,6 +6,7 @@
 const assistantManagerService = require('../services/openai-assistant-manager-service');
 const { sendResponseWithData } = require('../helper/commonResponseHandler');
 const { SuccessCode, ErrorCode } = require('../helper/statusCode');
+const activityHelper = require('../helper/activityHelper');
 
 /**
  * Get current assistant ID
@@ -78,6 +79,20 @@ const refreshAssistantId = async (req, res) => {
 
         const newAssistantId = await assistantManagerService.refreshAssistantId(config);
         const status = assistantManagerService.getStatus();
+
+        // Log refresh activity
+        try {
+            await activityHelper.logActivity({
+                projectId: null,
+                groupId: req.groupId || 1,
+                action: "OPENAI_ASSISTANT_REFRESHED",
+                description: `OpenAI Assistant ID refreshed from ${status.assistantId} to ${newAssistantId}`,
+                createdBy: req.userId || 1
+            });
+        } catch (activityError) {
+            console.error("Activity logging failed:", activityError);
+            // Don't fail the main operation if activity logging fails
+        }
 
         const response = {
             newAssistantId,
@@ -153,6 +168,20 @@ const updateAssistant = async (req, res) => {
 
         const updatedAssistant = await assistantManagerService.updateAssistant(assistantId, updates);
 
+        // Log update activity
+        try {
+            await activityHelper.logActivity({
+                projectId: null,
+                groupId: req.groupId || 1,
+                action: "OPENAI_ASSISTANT_UPDATED",
+                description: `OpenAI Assistant ${assistantId} configuration updated`,
+                createdBy: req.userId || 1
+            });
+        } catch (activityError) {
+            console.error("Activity logging failed:", activityError);
+            // Don't fail the main operation if activity logging fails
+        }
+
         return sendResponseWithData(
             res,
             SuccessCode.OK,
@@ -180,6 +209,20 @@ const deleteAssistant = async (req, res) => {
         const { assistantId } = req.params;
 
         const result = await assistantManagerService.deleteAssistant(assistantId);
+
+        // Log deletion activity
+        try {
+            await activityHelper.logActivity({
+                projectId: null,
+                groupId: req.groupId || 1,
+                action: "OPENAI_ASSISTANT_DELETED",
+                description: `OpenAI Assistant ${assistantId} deleted`,
+                createdBy: req.userId || 1
+            });
+        } catch (activityError) {
+            console.error("Activity logging failed:", activityError);
+            // Don't fail the main operation if activity logging fails
+        }
 
         return sendResponseWithData(
             res,

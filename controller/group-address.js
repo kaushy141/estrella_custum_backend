@@ -4,12 +4,13 @@ const { sendResponseWithData } = require("../helper/commonResponseHandler");
 const { SuccessCode, ErrorCode } = require("../helper/statusCode");
 const { Op } = require("sequelize");
 const _ = require("lodash");
+const activityHelper = require("../helper/activityHelper");
 const controller = {
   // Create new group address
   create: async function (req, res) {
     try {
       const data = req.body;
-      
+
       // Verify group exists
       const group = await Group.findByPk(data.groupId);
       if (!group) {
@@ -20,22 +21,22 @@ const controller = {
           null
         );
       }
-      
-             const groupAddress = await GroupAddress.create(data);
-       
-       // Log activity
-       try {
-         await activityHelper.logGroupAddressCreation(groupAddress, req.userId || data.createdBy || 1);
-       } catch (activityError) {
-         console.error("Activity logging failed:", activityError);
-         // Don't fail the main operation if activity logging fails
-       }
-       
-       let responseData = {
-         status: "success",
-         data: groupAddress,
-       };
-      
+
+      const groupAddress = await GroupAddress.create(data);
+
+      // Log activity
+      try {
+        await activityHelper.logGroupAddressCreation(groupAddress, req.userId || data.createdBy || 1);
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
+
+      let responseData = {
+        status: "success",
+        data: groupAddress,
+      };
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -57,7 +58,7 @@ const controller = {
     try {
       const { page = 1, limit = 10, isActive } = req.query;
       const offset = (page - 1) * limit;
-      
+
       let whereClause = {};
       const groupId = req.groupId;
       const isSuperAdmin = req.isSuperAdmin;
@@ -68,7 +69,7 @@ const controller = {
       if (isActive !== undefined) {
         whereClause.isActive = isActive === 'true';
       }
-      
+
       const groupAddresses = await GroupAddress.findAndCountAll({
         where: whereClause,
         include: [
@@ -82,7 +83,7 @@ const controller = {
         offset: parseInt(offset),
         order: [['createdAt', 'DESC']]
       });
-      
+
       let responseData = {
         status: "success",
         data: groupAddresses.rows,
@@ -90,7 +91,7 @@ const controller = {
         currentPage: parseInt(page),
         totalPages: Math.ceil(groupAddresses.count / limit)
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -111,7 +112,7 @@ const controller = {
   getById: async function (req, res) {
     try {
       const { id } = req.params;
-      
+
       const groupAddress = await GroupAddress.findOne({
         where: {
           $or: [
@@ -127,7 +128,7 @@ const controller = {
           }
         ]
       });
-      
+
       if (!groupAddress) {
         return sendResponseWithData(
           res,
@@ -136,12 +137,12 @@ const controller = {
           null
         );
       }
-      
+
       let responseData = {
         status: "success",
         data: groupAddress,
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -163,7 +164,7 @@ const controller = {
     try {
       const { id } = req.params;
       const data = req.body;
-      
+
       const groupAddress = await GroupAddress.findOne({
         where: {
           $or: [
@@ -172,7 +173,7 @@ const controller = {
           ]
         }
       });
-      
+
       if (!groupAddress) {
         return sendResponseWithData(
           res,
@@ -181,7 +182,7 @@ const controller = {
           null
         );
       }
-      
+
       // Verify group exists if groupId is being updated
       if (data.groupId) {
         const group = await Group.findByPk(data.groupId);
@@ -194,15 +195,29 @@ const controller = {
           );
         }
       }
-      
+
       await groupAddress.update(data);
       const updatedGroupAddress = await groupAddress.save();
-      
+
+      // Log update activity
+      try {
+        await activityHelper.logActivity({
+          projectId: 1, // Default project for address operations
+          groupId: groupAddress.groupId,
+          action: "GROUP_ADDRESS_UPDATED",
+          description: `Group address updated for group ID: ${groupAddress.groupId}`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
+
       let responseData = {
         status: "success",
         data: updatedGroupAddress,
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -223,7 +238,7 @@ const controller = {
   delete: async function (req, res) {
     try {
       const { id } = req.params;
-      
+
       const groupAddress = await GroupAddress.findOne({
         where: {
           $or: [
@@ -232,7 +247,7 @@ const controller = {
           ]
         }
       });
-      
+
       if (!groupAddress) {
         return sendResponseWithData(
           res,
@@ -241,14 +256,28 @@ const controller = {
           null
         );
       }
-      
+
+      // Log deletion activity before destroying
+      try {
+        await activityHelper.logActivity({
+          projectId: 1, // Default project for address operations
+          groupId: groupAddress.groupId,
+          action: "GROUP_ADDRESS_DELETED",
+          description: `Group address deleted for group ID: ${groupAddress.groupId}`,
+          createdBy: req.userId || 1
+        });
+      } catch (activityError) {
+        console.error("Activity logging failed:", activityError);
+        // Don't fail the main operation if activity logging fails
+      }
+
       await groupAddress.destroy();
-      
+
       let responseData = {
         status: "success",
         message: "Group address deleted successfully"
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -271,19 +300,19 @@ const controller = {
       const { groupId } = req.params;
       const { page = 1, limit = 10, isActive } = req.query;
       const offset = (page - 1) * limit;
-      
+
       let whereClause = { groupId };
       if (isActive !== undefined) {
         whereClause.isActive = isActive === 'true';
       }
-      
+
       const groupAddresses = await GroupAddress.findAndCountAll({
         where: whereClause,
         limit: parseInt(limit),
         offset: parseInt(offset),
         order: [['createdAt', 'DESC']]
       });
-      
+
       let responseData = {
         status: "success",
         data: groupAddresses.rows,
@@ -291,7 +320,7 @@ const controller = {
         currentPage: parseInt(page),
         totalPages: Math.ceil(groupAddresses.count / limit)
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
@@ -313,12 +342,12 @@ const controller = {
     try {
       const { city, state, country, page = 1, limit = 10 } = req.query;
       const offset = (page - 1) * limit;
-      
+
       let whereClause = {};
       if (city) whereClause.city = { [Op.iLike]: `%${city}%` };
       if (state) whereClause.state = { [Op.iLike]: `%${state}%` };
       if (country) whereClause.country = { [Op.iLike]: `%${country}%` };
-      
+
       const groupAddresses = await GroupAddress.findAndCountAll({
         where: whereClause,
         include: [
@@ -332,7 +361,7 @@ const controller = {
         offset: parseInt(offset),
         order: [['createdAt', 'DESC']]
       });
-      
+
       let responseData = {
         status: "success",
         data: groupAddresses.rows,
@@ -340,7 +369,7 @@ const controller = {
         currentPage: parseInt(page),
         totalPages: Math.ceil(groupAddresses.count / limit)
       };
-      
+
       return sendResponseWithData(
         res,
         SuccessCode.SUCCESS,
