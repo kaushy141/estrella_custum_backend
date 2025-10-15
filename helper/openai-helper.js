@@ -4,6 +4,7 @@ const openAIService = require('../services/openai-service');
 const invoiceTemplateService = require('../services/invoice-template-service');
 const { Invoice } = require('../models/invoice-model');
 const { CourierReceipt } = require('../models/courier-receipt-model');
+const { CustomDeclaration } = require('../models/custom-declaration-model');
 class OpenAIHelper {
     /**
      * Create a new OpenAI conversation thread
@@ -640,6 +641,92 @@ Your response must be parseable JSON only.`;
             }
 
             throw error;
+        }
+    }
+
+    /**
+     * Delete OpenAI file if it exists
+     * @param {string} openAIFileId - OpenAI file ID to delete
+     * @returns {Promise<boolean>} - Success status
+     */
+    async deleteOpenAIFile(openAIFileId) {
+        try {
+            if (!openAIFileId) {
+                console.log('No OpenAI file ID provided, skipping deletion');
+                return true;
+            }
+
+            console.log(`Deleting OpenAI file: ${openAIFileId}`);
+            await openAIService.deleteFile(openAIFileId);
+            console.log(`✅ OpenAI file deleted successfully: ${openAIFileId}`);
+            return true;
+        } catch (error) {
+            console.error(`Error deleting OpenAI file ${openAIFileId}:`, error.message);
+            // Don't throw error - file deletion failure shouldn't prevent document deletion
+            return false;
+        }
+    }
+
+    /**
+     * Delete OpenAI files for invoice
+     * @param {Object} invoice - Invoice object
+     * @returns {Promise<boolean>} - Success status
+     */
+    async deleteInvoiceOpenAIFiles(invoice) {
+        try {
+            let success = true;
+
+            if (invoice.openAIFileId) {
+                const deleted = await this.deleteOpenAIFile(invoice.openAIFileId);
+                if (!deleted) success = false;
+            }
+
+            return success;
+        } catch (error) {
+            console.error('Error deleting invoice OpenAI files:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Delete OpenAI files for courier receipt
+     * @param {Object} courierReceipt - Courier receipt object
+     * @returns {Promise<boolean>} - Success status
+     */
+    async deleteCourierReceiptOpenAIFiles(courierReceipt) {
+        try {
+            let success = true;
+
+            if (courierReceipt.openAIFileId) {
+                const deleted = await this.deleteOpenAIFile(courierReceipt.openAIFileId);
+                if (!deleted) success = false;
+            }
+
+            return success;
+        } catch (error) {
+            console.error('Error deleting courier receipt OpenAI files:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Delete OpenAI files for custom declaration
+     * @param {Object} customDeclaration - Custom declaration object
+     * @returns {Promise<boolean>} - Success status
+     */
+    async deleteCustomDeclarationOpenAIFiles(customDeclaration) {
+        try {
+            let success = true;
+
+            if (customDeclaration.openAIFileId) {
+                const deleted = await this.deleteOpenAIFile(customDeclaration.openAIFileId);
+                if (!deleted) success = false;
+            }
+
+            return success;
+        } catch (error) {
+            console.error('Error deleting custom declaration OpenAI files:', error);
+            return false;
         }
     }
 }

@@ -330,6 +330,19 @@ const controller = {
         // Don't fail the main operation if activity logging fails
       }
 
+      // Delete OpenAI files before destroying the courier receipt
+      try {
+        const openAIDeleted = await openAIHelper.deleteCourierReceiptOpenAIFiles(courierReceipt);
+        if (openAIDeleted) {
+          console.log(`✅ OpenAI files deleted for courier receipt ${courierReceipt.id}`);
+        } else {
+          console.log(`⚠️ Some OpenAI files could not be deleted for courier receipt ${courierReceipt.id}`);
+        }
+      } catch (openAIError) {
+        console.error("OpenAI file deletion failed:", openAIError);
+        // Don't fail the main operation if OpenAI file deletion fails
+      }
+
       await courierReceipt.destroy();
 
       let responseData = {

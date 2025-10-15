@@ -335,6 +335,19 @@ const controller = {
         // Don't fail the main operation if activity logging fails
       }
 
+      // Delete OpenAI files before destroying the invoice
+      try {
+        const openAIDeleted = await openAIHelper.deleteInvoiceOpenAIFiles(invoice);
+        if (openAIDeleted) {
+          console.log(`✅ OpenAI files deleted for invoice ${invoice.id}`);
+        } else {
+          console.log(`⚠️ Some OpenAI files could not be deleted for invoice ${invoice.id}`);
+        }
+      } catch (openAIError) {
+        console.error("OpenAI file deletion failed:", openAIError);
+        // Don't fail the main operation if OpenAI file deletion fails
+      }
+
       await invoice.destroy();
 
       let responseData = {
