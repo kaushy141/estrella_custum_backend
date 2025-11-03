@@ -8,6 +8,7 @@ const { Op } = require("sequelize");
 const _ = require("lodash");
 const activityHelper = require("../helper/activityHelper");
 const openAIHelper = require("../helper/openai-helper");
+const openAIService = require("../services/openai-service");
 const controller = {
   // Reusable function to analyze custom declaration
   analyzeCustomDeclaration: async function (customDeclaration, project, invoices) {
@@ -16,6 +17,8 @@ const controller = {
       if (!customDeclaration.filePath || !customDeclaration.fileName) {
         throw new Error("Custom declaration file is missing");
       }
+
+
 
       if (invoices.length === 0) {
         throw new Error("No invoices with OpenAI file IDs found for this project. Custom declaration analysis requires invoices that have been uploaded to OpenAI for comparison.");
@@ -33,23 +36,38 @@ const controller = {
       // The analysis will update the insights field when complete
 
       // Start comprehensive analysis in background
-      const analysisPromise = openAIHelper.analyzeCustomDeclarationDocument(project, customDeclaration, invoices);
+      const analysisPromise = openAIService.extractCustomDeclarationDocument(project, customDeclaration, threadId);
 
+      //console.log('analysisPromise', analysisPromise);
       // Handle the promise to avoid unhandled promise rejection
       analysisPromise
-        .then((result) => {
-          console.log(`Custom declaration analysis completed for custom declaration ${customDeclaration.id}:`, result);
+        .then(async (result) => {
+          console.log(`Custom declaration analysis completed for custom declaration:`, result);
 
           // Check if insights were updated
-          if (result.success && result.analysisData) {
-            console.log(`✅ Insights successfully updated for custom declaration ${customDeclaration.id}`);
+          if (result.success && result.analysisResult) {
+            console.log(`✅ Insights successfully updated for custom declaration `);
+
+            await customDeclaration.update({ originalFileContent: JSON.stringify(result.analysisResult) });
+
+
+            const analysisResult = await openAIService.analyzeCustomDeclarationDocumentWithExistingFiles(project, customDeclaration, invoices, threadId);
+            if (analysisResult.success && analysisResult.analysisResult) {
+              console.log(`✅ Insights successfully updated for custom declaration `);
+              await customDeclaration.update({ insights: JSON.stringify(analysisResult.analysisResult), status: "completed" });
+            } else {
+              console.log(`❌ Insights NOT updated for custom declaration`);
+              console.log('Result:', JSON.stringify(analysisResult));
+            }
+
+            console.log(`✅ Insights successfully updated for custom declaration `);
           } else {
-            console.log(`❌ Insights NOT updated for custom declaration ${customDeclaration.id}`);
-            console.log('Result:', result);
+            console.log(`❌ Insights NOT updated for custom declaration`);
+            console.log('Result:', JSON.stringify(result));
           }
         })
         .catch((error) => {
-          console.error(`Custom declaration analysis failed for custom declaration ${customDeclaration.id}:`, error);
+          console.error(`Custom declaration analysis failed for custom declaration:`, error);
         });
 
       return {
@@ -545,7 +563,7 @@ const controller = {
       const invoices = await Invoice.findAll({
         where: {
           projectId: project.id,
-          openAIFileId: { [Op.ne]: null } // Only invoices that have been uploaded to OpenAI
+          //openAIFileId: { [Op.ne]: null } // Only invoices that have been uploaded to OpenAI
         },
         order: [['createdAt', 'DESC']]
       });

@@ -1,5 +1,7 @@
 const OpenAI = require('openai');
 const { toFile } = require('openai');
+const { CustomDeclaration } = require('../models/custom-declaration-model');
+const path = require('path');
 require('dotenv').config();
 
 class OpenAIService {
@@ -17,7 +19,7 @@ class OpenAIService {
      * Get or create OpenAI Assistant ID
      * @returns {Promise<string>} - Assistant ID
      */
-    async getAssistantId() {
+    async getAssistantId(type = 'invoice') {
         try {
             // Return cached assistant ID if available
             if (this.assistantId && this.assistantCreated) {
@@ -26,8 +28,13 @@ class OpenAIService {
 
             // Check environment variable first
             let assistantId = process.env.OPENAI_ASSISTANT_ID;
+            if (type === 'invoice') {
+                assistantId = process.env.OPENAI_ASSISTANT_ID;
+            } else if (type === 'custom_declaration') {
+                assistantId = process.env.CUSTOM_VERIFICATION_ASSISTANT_ID;
+            }
 
-            if (assistantId && assistantId !== 'your_openai_assistant_id_here') {
+            if (assistantId && assistantId !== 'your_openai_assistant_id_here' && assistantId !== 'your_custom_verification_assistant_id_here') {
                 console.log(`Using existing assistant ID from environment: ${assistantId}`);
                 this.assistantId = assistantId;
                 this.assistantCreated = true;
@@ -37,7 +44,7 @@ class OpenAIService {
             // Create new assistant if none exists
             console.log('Creating new OpenAI Assistant...');
 
-            const assistant = await this.openai.beta.assistants.create({
+            let assistantConfig = {
                 name: "Invoice Translation Assistant",
                 description: "Professional assistant for translating invoices and comparing mismatches between original and translated invoices or between invoice and customs clearance documents.",
                 model: "gpt-4o-mini",
@@ -74,9 +81,43 @@ Always provide professional, accurate, and detailed responses suitable for busin
                 tools: [
                     {
                         type: "file_search"
+                    },
+                    {
+                        type: "code_interpreter"
                     }
                 ]
-            });
+            };
+
+            if (type === 'custom_declaration') {
+                assistantConfig.name = "Custom Declaration Verification Assistant";
+                assistantConfig.description = "Professional assistant for verifying customs declarations against invoice data.";
+                assistantConfig.instructions = `You are a professional customs declaration verification assistant with expertise in:
+                1. **Custom Declaration Analysis**: Extract customs declaration details, item classifications, values, and tariff codes
+2. **Invoice Cross-Reference**: Compare custom declaration data against ${invoices.length} invoice(s) for accuracy and compliance
+3. **Address Validation**: Cross-check billing addresses, shipping addresses, and consignee information
+4. **Item Verification**: Validate item counts, weights, dimensions, descriptions, and classifications
+5. **Value Validation**: Cross-reference total costs, unit prices, currency, and cost breakdowns
+6. **Compliance Check**: Ensure customs compliance, proper documentation, and regulatory adherence
+                `;
+                assistantConfig.tools = [
+                    { type: "file_search" },
+                    { type: "code_interpreter" },
+                    {
+                        type: "function", function: {
+                            name: "analyze_custom_declaration",
+                            description: "Analyze a customs declaration document and return a JSON object with the analysis results.",
+                            parameters: {
+                                type: "object",
+                                properties: {
+                                    customDeclaration: { type: "string", description: "The customs declaration document to analyze." }
+                                }
+                            }
+                        }
+                    }
+                ];
+            }
+
+            const assistant = await this.openai.beta.assistants.create(assistantConfig);
 
             this.assistantId = assistant.id;
             this.assistantCreated = true;
@@ -114,7 +155,7 @@ Always provide professional, accurate, and detailed responses suitable for busin
      * @param {string} instructions - Instructions for the run
      * @returns {Promise<Object>} - Run object
      */
-    async createRun(threadId, instructions) {
+    async createRun(threadId, instructions, type = 'invoice', options = {}) {
         try {
             // Validate parameters
             if (!threadId || typeof threadId !== 'string') {
@@ -125,8 +166,25 @@ Always provide professional, accurate, and detailed responses suitable for busin
             }
 
             // Get assistant ID
-            const assistantId = await this.getAssistantId();
+            const assistantId = await this.getAssistantId(type);
             console.log(`Using assistant ID: ${assistantId}`);
+
+            // Prepare run parameters
+            const runParams = {
+                assistant_id: assistantId,
+                instructions: instructions
+            };
+
+            // Add response_format if specified (for JSON mode)
+            if (options.responseFormat) {
+                runParams.response_format = options.responseFormat;
+                console.log('Using response_format:', options.responseFormat);
+            }
+
+            if (typeof options.temperature === 'number') {
+                runParams.temperature = options.temperature;
+                console.log('Using temperature:', options.temperature);
+            }
 
             // Create a run to process the message with retry logic
             let run;
@@ -135,10 +193,7 @@ Always provide professional, accurate, and detailed responses suitable for busin
 
             while (retryCount < maxRetries) {
                 try {
-                    run = await this.openai.beta.threads.runs.create(threadId, {
-                        assistant_id: assistantId,
-                        instructions: instructions
-                    });
+                    run = await this.openai.beta.threads.runs.create(threadId, runParams);
                     console.log(`✅ Created run: ${run.id} for thread: ${threadId}`);
                     break; // Success, exit retry loop
                 } catch (runError) {
@@ -188,7 +243,7 @@ Always provide professional, accurate, and detailed responses suitable for busin
                         if (runStatus.status === 'completed') {
                             console.log(`✅ Existing run completed. Creating new run...`);
                             // Retry creating the run
-                            return await this.createRun(threadId, instructions);
+                            return await this.createRun(threadId, instructions, type, options);
                         } else {
                             throw new Error(`Existing run ${activeRun.id} failed with status: ${runStatus.status}`);
                         }
@@ -277,14 +332,21 @@ Always provide professional, accurate, and detailed responses suitable for busin
      */
     extractJsonFromResponse(responseText) {
         try {
+            // Trim whitespace first
+            const trimmedText = responseText.trim();
+
             // First try direct parsing
-            return JSON.parse(responseText);
+            return JSON.parse(trimmedText);
         } catch (error) {
-            // Try to find JSON in the response
+            // Log the error for debugging
+            console.log('JSON parsing failed, attempting pattern extraction...');
+            console.log('Response text (first 500 chars):', responseText.substring(0, 500));
+
+            // Try to find JSON in the response using various patterns
             const jsonPatterns = [
-                /\{[\s\S]*\}/,  // Match any object-like structure
-                /```json\s*(\{[\s\S]*?\})\s*```/i,  // Match JSON in code blocks
-                /```\s*(\{[\s\S]*?\})\s*```/i,  // Match JSON in generic code blocks
+                /```json\s*(\{[\s\S]*?\})\s*```/i,  // Match JSON in ```json``` code blocks
+                /```\s*(\{[\s\S]*?\})\s*```/i,      // Match JSON in generic code blocks
+                /\{[\s\S]*\}/,                      // Match any object-like structure (greedy)
             ];
 
             for (const pattern of jsonPatterns) {
@@ -292,13 +354,16 @@ Always provide professional, accurate, and detailed responses suitable for busin
                 if (match) {
                     try {
                         const jsonStr = match[1] || match[0];
+                        console.log('Extracted JSON string (first 200 chars):', jsonStr.substring(0, 200));
                         return JSON.parse(jsonStr);
                     } catch (parseError) {
+                        console.log(`Pattern failed: ${parseError.message}`);
                         continue; // Try next pattern
                     }
                 }
             }
 
+            console.error('Failed to extract JSON from response');
             return null; // No valid JSON found
         }
     }
@@ -313,6 +378,7 @@ Always provide professional, accurate, and detailed responses suitable for busin
         const fileExtension = path.extname(fileName).toLowerCase();
 
         // List of file types supported by OpenAI file search
+        // NOTE: .xlsx and .xls are NOT supported by file_search, only by code_interpreter
         const supportedFileTypes = [
             '.pdf', '.txt', '.docx', '.doc', '.csv', '.json',
             '.md', '.html', '.htm', '.rtf', '.odt'
@@ -969,9 +1035,18 @@ Always provide professional, accurate, and detailed responses suitable for busin
      * @param {string} threadId - OpenAI thread ID
      * @returns {Promise<Object>} - Analysis result object
      */
-    async analyzeCustomDeclarationDocumentWithExistingFiles(project, customDeclarationId, invoices, threadId) {
+    async extractCustomDeclarationDocument(project, customDeclaration, threadId) {
         try {
-            console.log(`Starting comprehensive custom declaration analysis with existing files for project ${project.id}...`);
+
+            //check for customDeclaration.openAIFileId is not null
+            if (!customDeclaration.openAIFileId) {
+                const fullFilePath = path.join(__dirname, '..', customDeclaration.filePath);
+                const openAIFileId = await this.uploadFile(fullFilePath, customDeclaration.fileName);
+                await customDeclaration.update({ openAIFileId: openAIFileId.id });
+
+                customDeclaration = await CustomDeclaration.findByPk(customDeclaration.id);
+                console.log(`Custom declaration file uploaded to OpenAI with ID: ${customDeclaration.openAIFileId}`);
+            }
 
 
             // Prepare comprehensive analysis data
@@ -982,44 +1057,381 @@ Always provide professional, accurate, and detailed responses suitable for busin
                     description: project.description
                 },
                 customDeclaration: {
-                    id: customDeclarationId,
+                    id: customDeclaration.openAIFileId,
                 },
-                invoices: invoices.map(invoice => ({
-                    id: invoice.id,
-                    originalFileContent: invoice.originalFileContent,
-                    translatedFileContent: invoice.translatedFileContent
-                })),
                 analysisTimestamp: new Date().toISOString(),
-                invoiceCount: invoices.length
+            };
+            // Create comprehensive analysis instructions
+
+            const extractCustomsDeclarationDataSchema = {
+                "name": "extract_customs_declaration_data",
+                "description": "Extracts structured customs declaration data (Parts I-VII) from a PDF or text document.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "Certified_Customs_Declaration_Part_I": {
+                            "type": "object",
+                            "properties": {
+                                "Number_LRN": { "type": "string" },
+                                "Number_MRN": { "type": "string" },
+                                "Date_of_receipt_of_application": { "type": "string" },
+                                "Message_ID": { "type": "string" },
+                                "Creation_Date": { "type": "string" },
+                                "Company_Name": { "type": "string" },
+                                "Company_Address": { "type": "string" },
+                                "Recipient_Name": { "type": "string" },
+                                "Recipient_Address": { "type": "string" },
+                                "Applicant_Name": { "type": "string" }
+                            },
+                            "required": []
+                        },
+                        "Registration_Declaration_Part_II": {
+                            "type": "object",
+                            "properties": {
+                                "Importer": {
+                                    "type": "object",
+                                    "properties": {
+                                        "Type_of_person": { "type": "string" },
+                                        "NIP": { "type": "string" },
+                                        "Region": { "type": "string" },
+                                        "Identification_Number": { "type": "string" }
+                                    },
+                                    "required": []
+                                },
+                                "Applicant": {
+                                    "type": "object",
+                                    "properties": {
+                                        "Type_of_person": { "type": "string" },
+                                        "NIP": { "type": "string" },
+                                        "Region": { "type": "string" },
+                                        "Identification_Number": { "type": "string" },
+                                        "Contact_Person": { "type": "string" },
+                                        "Representative": { "type": "string" },
+                                        "Type_of_representation": { "type": "string" },
+                                        "Representative_Identification_Number": { "type": "string" },
+                                        "Representative_Contact_Person": { "type": "string" },
+                                        "tel": { "type": "string" },
+                                        "email": { "type": "string" }
+                                    },
+                                    "required": []
+                                },
+                                "Permits": { "type": "string" },
+                                "Security": { "type": "string" },
+                                "Security_type": { "type": "string" },
+                                "Application_type": { "type": "string" },
+                                "Application_UC": { "type": "string" },
+                                "Number_of_Items": { "type": "string" },
+                                "Number_of_Packages": { "type": "string" },
+                                "Currency_Exchange_Rate": { "type": "string" }
+                            },
+                            "required": []
+                        },
+                        "Delivery_Receipt_Part_III": {
+                            "type": "object",
+                            "properties": {
+                                "Attached_documents": { "type": "string" },
+                                "Reference": { "type": "string" },
+                                "Shipping_Documents": { "type": "string" },
+                                "Exporter_Name": { "type": "string" },
+                                "Exporter_Address": { "type": "string" },
+                                "Transport_type": { "type": "string" },
+                                "Nationality": { "type": "string" },
+                                "Goods_location": { "type": "string" },
+                                "Permit_number": { "type": "string" },
+                                "Gross_Weight": { "type": "string" },
+                                "Invoice_value": { "type": "string" },
+                                "Invoice_currency": { "type": "string" },
+                                "Containers": { "type": "string" },
+                                "Destination_country": { "type": "string" },
+                                "Shipping": {
+                                    "type": "object",
+                                    "properties": {
+                                        "Country": { "type": "string" },
+                                        "Transport_border": { "type": "string" },
+                                        "Transport_number": { "type": "string" },
+                                        "Transaction_type": { "type": "string" },
+                                        "Delivery_terms": { "type": "string" }
+                                    },
+                                    "required": []
+                                }
+                            },
+                            "required": []
+                        },
+                        "Goods_Part_IV": {
+                            "type": "object",
+                            "properties": {
+                                "Goods_description": { "type": "string" },
+                                "CN_Code": { "type": "string" },
+                                "Item_code": { "type": "string" },
+                                "Taric": { "type": "string" },
+                                "National_Additional_Code": { "type": "string" },
+                                "Valuation_method": { "type": "string" },
+                                "Preferences": { "type": "string" },
+                                "Previous_Documents": { "type": "string" },
+                                "Item_number": { "type": "string" },
+                                "Packaging": { "type": "string" },
+                                "Attached_Documents": { "type": "string" }
+                            },
+                            "required": []
+                        },
+                        "Other_Information_Part_V": {
+                            "type": "object",
+                            "properties": {
+                                "Security_type": { "type": "string" },
+                                "GRN": { "type": "string" },
+                                "Access_Code": { "type": "string" },
+                                "NR_Identifier": { "type": "string" },
+                                "Additional_Tax_References": { "type": "string" },
+                                "Packaging_Number": { "type": "string" },
+                                "Packaging_Type": { "type": "string" },
+                                "Packaging_Marking": { "type": "string" },
+                                "Tax_Calculation_Duties_and_Tax": { "type": "string" },
+                                "Tax": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "Type": { "type": "string" },
+                                            "Base": { "type": "string" },
+                                            "Rate": { "type": "string" },
+                                            "Sum": { "type": "string" },
+                                            "Payment_Method": { "type": "string" }
+                                        },
+                                        "required": []
+                                    }
+                                },
+                                "Fired": { "type": "string" }
+                            },
+                            "required": []
+                        },
+                        "Fire_Section_Part_VI": {
+                            "type": "object",
+                            "properties": {
+                                "Procedure": { "type": "string" },
+                                "Country_of_Origin": { "type": "string" },
+                                "Met_Weight": { "type": "string" },
+                                "Quantity_in_refill_unit": { "type": "string" },
+                                "Stat_Value": { "type": "string" }
+                            },
+                            "required": []
+                        },
+                        "Fee_Section_Part_VII": {
+                            "type": "object",
+                            "properties": {
+                                "Fee": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "Fee_Type": { "type": "string" },
+                                            "Sum": { "type": "string" },
+                                            "Payment_Method": { "type": "string" }
+                                        },
+                                        "required": []
+                                    }
+                                }
+                            },
+                            "required": []
+                        }
+                    },
+                    "required": []
+                }
+            }
+
+
+            const analysisInstructions = `You are analyzing a custom declaration (ZC document)
+Task:
+- Extract following data from the custom declaration file:
+From Certified Customs Declaration Part I:
+    - Number LRN
+    - Number MRN
+    - Date of receipt of application:
+    - Message ID
+    - Creation Date
+    - Company Name
+    - Company Address
+    - Recipient Name
+    - Recipient Address
+    - Applicant Name
+
+From Registration Declaration Part II:
+    - Importer
+        - Type of person
+        - NIP
+        - Region
+        - Identification Number
+
+    - Applicant
+        - Type of person
+        - NIP
+        - Region
+        - Identification Number
+        - Contact Person
+        - Representative
+        - Type of representation 
+        - Identification Number
+        - Contact Person
+        - tel
+        - email
+    - Permits
+    - Security
+    - Security type
+    - Application type
+    - Application UC
+    - Number of Items
+    - NUmber of Packages
+    - Currency Exchange Rate
+- From Delivery Receipt Part III:
+    - Attached documents
+    - Reference
+    - Shipping Documents
+    - Exporter Name
+    - Exporter Address
+    - Transport type
+    - Nationality
+    - Goods location
+    - Permit number
+    - Gross Weight
+    - Invoice value
+    - Invoice currency
+    - Containers Yes/No
+    - Destination country
+    - Shipping
+        - Country
+        - Transport border
+        - Transport number
+        - Transaction type
+        - Delivery terms
+- From Goods Part IV:
+    - Goods description
+    - CN Code
+    - Item code
+    - Taric
+    - National Additional Code
+    - Valuation  method
+    - Preferences
+    - Previous Documents
+    - Item number
+    - Packaging
+    - Attached Documents
+- From Other Information Part V:
+    - Security type
+    - GRN
+    - Access Code
+    - NR Identifier
+    - Additional Tax References
+    - Packaging Number
+    - Packaging Type
+    - Packaging Marking
+    - Tax Calculation Duties and Tax
+    - Tax as LIST["Type","Base","Rate","Sum","Payment Method"]
+    - Fired
+
+- From Fire Section Part VI:
+    - Procedure
+    - Country of Origin
+    - Met Weight
+    - Quantity in refill unit
+    - Stat. Value
+
+- From Fee Section Part VII:
+    - Fee as LIST["Fee Type","Sum","Payment Method"]
+`;
+
+            // Prepare attachments array with available files
+            const attachments = [];
+
+            // Add custom declaration file if openAIFileId is available
+            if (customDeclaration.openAIFileId) {
+                attachments.push({
+                    file_id: customDeclaration.openAIFileId,
+                    tools: [{ "type": "file_search" }]
+                });
+            }
+
+            console.log(`Prepared ${attachments.length} file attachments for custom declaration analysis (1 custom declaration)`);
+
+            // Add message to thread with attachments
+            await this.addMessageToThread(threadId, analysisInstructions, attachments);
+
+            // Create run for analysis
+            const run = await this.createRun(threadId, analysisInstructions, 'custom_declaration', { responseFormat: { type: 'json_schema', json_schema: { name: extractCustomsDeclarationDataSchema.name, schema: extractCustomsDeclarationDataSchema.parameters } }, temperature: 0 });
+
+            // Wait for completion
+            const runStatus = await this.waitForRunCompletion(threadId, run.id);
+
+            if (runStatus.status !== 'completed') {
+                const errorDetails = runStatus.last_error
+                    ? `${runStatus.last_error.code}: ${runStatus.last_error.message}`
+                    : 'No error details available';
+                throw new Error(`Analysis run failed with status: ${runStatus.status}. Details: ${errorDetails}`);
+            }
+
+            // Get response messages
+            const messages = await this.getThreadMessages(threadId);
+
+            if (!messages || messages.length === 0) {
+                throw new Error('No analysis response received');
+            }
+
+            // Extract analysis response from AI
+            const aiMessage = messages[0];
+            let analysisResult = null;
+
+            if (aiMessage.content && aiMessage.content.length > 0) {
+                const responseText = aiMessage.content[0].text.value;
+                console.log('Raw AI response received for custom declaration analysis:', responseText.substring(0, 500) + '...');
+
+                // Parse JSON response (when using json_schema response format, response should be valid JSON)
+                analysisResult = this.extractJsonFromResponse(responseText);
+
+                if (!analysisResult) {
+                    throw new Error('Failed to parse JSON from AI response');
+                }
+
+                console.log('✅ Successfully parsed custom declaration analysis result');
+            } else {
+                throw new Error('Invalid response format from AI');
+            }
+
+            console.log('✅ Comprehensive custom declaration analysis completed successfully');
+
+            return {
+                success: true,
+                analysisResult: analysisResult
             };
 
-            console.log(`Prepared analysis data for ${invoices.length} invoices and custom declaration`);
 
-            // Create comprehensive analysis instructions
+        } catch (error) {
+            console.error('❌ Error in custom declaration analysis with existing files:', error);
+
+            return {
+                success: false,
+                error: error.message,
+            };
+        }
+    }
+
+    async analyzeCustomDeclarationDocumentWithExistingFiles(project, customDeclaration, invoices, threadId) {
+        try {
+            console.log(`Starting comprehensive custom declaration analysis with existing files for project...`);
+
             const analysisInstructions = `You are analyzing a custom declaration (ZC document) against invoice data for comprehensive customs validation and accuracy verification.
+Task:
+**Custom Declaration Data:**
+${customDeclaration.originalFileContent}
+**${invoices.length} Invoice(s) Data:**
+${invoices.map(invoice => invoice.originalFileContent).join('\n')}
 
 **Analysis Context:**
-- Project: ${project.title} (ID: ${project.id})
 - Invoice Count: ${invoices.length}
-- Analysis Type: Comprehensive customs declaration content-based comparison
+- Invoice Items Count: ${invoices.map(invoice => JSON.parse(invoice.originalFileContent).items.length).reduce((a, b) => a + b, 0)}
+- Invoice ItemsTotal Quantity: ${invoices.map(invoice => JSON.parse(invoice.originalFileContent).items.reduce((a, b) => a + b.quantity, 0)).reduce((a, b) => a + b, 0)}
+- Invoice Items Total Gross Weight: ${invoices.map(invoice => JSON.parse(invoice.originalFileContent).items.reduce((a, b) => a + b.grossWeight, 0)).reduce((a, b) => a + b, 0)}
+- Invoice Items Total Net Weight: ${invoices.map(invoice => JSON.parse(invoice.originalFileContent).items.reduce((a, b) => a + b.netWeight, 0)).reduce((a, b) => a + b, 0)}
+- Invoice Items Total Value in ${project.currency}: ${invoices.map(invoice => JSON.parse(invoice.originalFileContent).items.reduce((a, b) => a + b.total, 0)).reduce((a, b) => a + b, 0)}
 
 **Primary Objectives:**
-1. **Custom Declaration Analysis**: Extract customs declaration details, item classifications, values, and tariff codes
-2. **Invoice Cross-Reference**: Compare custom declaration data against ${invoices.length} invoice(s) for accuracy and compliance
-3. **Address Validation**: Cross-check billing addresses, shipping addresses, and consignee information
-4. **Item Verification**: Validate item counts, weights, dimensions, descriptions, and classifications
-5. **Value Validation**: Cross-reference total costs, unit prices, currency, and cost breakdowns
-6. **Compliance Check**: Ensure customs compliance, proper documentation, and regulatory adherence
-
-**Custom Declaration Focus Areas:**
-- Import/export declaration numbers and references
-- Origin and destination country codes and customs offices
-- Item classifications (HS codes, tariff classifications)
-- Declared values, quantities, weights, and measurements
-- Consignee and consignor information
-- Customs duties, taxes, and fees calculation
-- Document references and certifications
-- Shipping method and transport details
 
 **Critical Cross-Check Validations:**
 1. **Address Verification:**
@@ -1049,165 +1461,18 @@ Always provide professional, accurate, and detailed responses suitable for busin
    - Trade agreement applicability
 
 Follow these rules:
-  1. Extract key data: MRN, LRN, acceptance/release date, procedure code, importer/exporter/representative (EORI/NIP), CN/TARIC code, countries, Incoterm, mass, values, duty/VAT (rate/base/amount/payment method), documents, status.
-  2. Compare to invoice data: totals, dates, HSN, quantities, weights, and currencies.
-  3. Compute weighted match score:
-     - Parties 20%, Values 25%, HS/CN 20%, Weight 10%, Dates 10%, Duty/VAT 15%.
-  4. Validate CN 71131100 duty (2.5%) and VAT (23%) via TARIC/ISZTAR4.
-  5. Identify VAT route: Article 33a (deferred) if VAT method=G, or Normal if paid at border.
-  6. Flag top issues: mismatches, invalid IDs, wrong CN, rate differences, missing documents, procedure != 4000, status != ZWOLNIONA.
-  7. Produce the JSON strictly in this format.
+
+
+**VERIFICATION CHECKLIST REQUIREMENT:**
+Your analysis MUST include a comprehensive checklist with:
+- ✅ MATCHED items between custom declaration and invoice
+- ❌ UNMATCHED/MISMATCHED items that need attention
+- ⚠️ WARNINGS for potential issues
+- 📋 Priority ranking (Critical, High, Medium, Low)
 
 **Response Format Requirements:**
 Provide a comprehensive JSON response with the following structure:
-{
-  "success": true,
-  "analysisType": "custom_declaration_comprehensive_validation",
-  "timestamp": "ISO_TIMESTAMP",
-  "projectInfo": {
-    "id": PROJECT_ID,
-    "title": "PROJECT_TITLE"
-  },
-  "customDeclarationAnalysis": {
-    "fileName": "FILENAME",
-    "declarationInfo": {
-      "declarationNumber": "Declaration reference number",
-      "declarationType": "Import/Export type",
-      "issueDate": "Declaration issue date",
-      "validUntil": "Declaration validity period",
-      "customsOffice": "Customs office details"
-    },
-    "originDestination": {
-      "originCountry": "Country of origin",
-      "originCity": "Origin city/port",
-      "destinationCountry": "Destination country",
-      "destinationCity": "Destination city/port",
-      "routeTransit": "Shipping route and transit points"
-    },
-    "partyInfo": {
-      "consignor": "Exporter/consignor information",
-      "consignee": "Importer/consignee information",
-      "shippingAgent": "Shipping agent details",
-      "customsBroker": "Customs broker information"
-    },
-    "items": [
-      {
-        "itemIndex": INDEX,
-        "description": "Product description",
-        "hsCode": "HS classification code",
-        "quantity": "Item quantity",
-        "unit": "Measurement unit",
-        "weight": "Gross/net weight",
-        "dimensions": "Package dimensions",
-        "value": "Declared value per unit",
-        "totalValue": "Total item value",
-        "originCountry": "Country of origin for item",
-        "purpose": "Intended use/purpose"
-      }
-    ],
-    "financialDetails": {
-      "totalValue": "Total declared value",
-      "currency": "Currency code",
-      "exchangeRate": "Exchange rate if applicable",
-      "duties": "Calculated duties",
-      "taxes": "Additional taxes",
-      "fees": "Customs fees",
-      "grandTotal": "Grand total amount"
-    }
-  },
-  "invoiceComparison": {
-    "matchedInvoices": [
-      {
-        "invoiceId": INVOICE_ID,
-        "fileName": "INVOICE_FILENAME",
-        "correlationScore": "Similarity percentage",
-        "addressValidation": {
-          "billingAddressMatch": true/false,
-          "shippingAddressMatch": true/false,
-          "consigneeMatch": true/false,
-          "addressDifferences": ["Specific differences"]
-        },
-        "itemValidation": {
-          "itemCountMatch": true/false,
-          "quantityVariance": "Percentage difference",
-          "weightVariance": "Weight difference",
-          "itemDifferences": ["Specific item discrepancies"]
-        },
-        "financialValidation": {
-          "totalCostVariance": "Cost difference percentage",
-          "currencyMatch": true/false,
-          "unitPriceDifferences": ["Unit price variations"],
-          "taxCalculationMatch": true/false
-        },
-        "matches": [
-          "Specific matching criteria"
-        ],
-        "discrepancies": [
-          "Critical discrepancies requiring attention"
-        ],
-        "warnings": [
-          "Non-critical issues to review"
-        ]
-      }
-    ],
-    "summary": {
-      "totalInvoicesAnalyzed": COUNT,
-      "successfulMatches": COUNT,
-      "addressConsistencyScore": "Address matching percentage",
-      "itemConsistencyScore": "Item data consistency percentage",
-      "financialConsistencyScore": "Financial data consistency percentage",
-      "overallComplianceScore": "Overall compliance rating",
-      "criticalDiscrepancies": COUNT,
-      "warnings": COUNT,
-      "resolvedAutomatically": COUNT
-    }
-  },
-  "complianceAssessment": {
-    "regulatoryCompliance": {
-      "hsCodeAccuracy": "HS code validation result",
-      "countryOfOrigin": "Origin documentation status",
-      "tradeAgreementEligibility": "Trade agreement compliance",
-      "restrictedItemsCheck": "Restrictions verification"
-    },
-    "documentationCheck": {
-      "requiredCertificates": ["Required certificates"],
-      "missingDocuments": ["Missing documentation"],
-      "validityStatus": "Document validity assessment"
-    },
-    "riskFactors": [
-      "Identified compliance risks"
-    ]
-  },
-  "validationResults": {
-    "dataAccuracy": "Overall data accuracy percentage",
-    "completenessScore": "Document completeness assessment",
-    "consistencyCheck": "Cross-document consistency rating",
-    "complianceStatus": "Customs compliance status",
-    "readyForSubmission": true/false,
-    "requiresReview": true/false
-  },
-  "recommendations": {
-    "immediateActions": [
-      "Urgent actions required"
-    ],
-    "improvements": [
-      "Suggested data improvements"
-    ],
-    "complianceActions": [
-      "Required compliance steps"
-    ],
-    "documentationUpdates": [
-      "Documentation update requirements"
-    ]
-  },
-  "processingStats": {
-    "filesProcessed": COUNT,
-    "contentDataAnalyzed": COUNT,
-    "crossChecksPerformed": COUNT,
-    "analysisDuration": "Processing time",
-    "timestamp": "Completion timestamp"
-  }
-}
+
 
 **Analysis Guidelines:**
 - Prioritize customs compliance and regulatory accuracy
@@ -1218,34 +1483,309 @@ Provide a comprehensive JSON response with the following structure:
 Focus on providing comprehensive customs validation that ensures accurate documentation and compliance readiness.
 Return only valid JSON.`;
 
+            const customDeclarationComprehensiveValidationSchema = {
+                "name": "custom_declaration_comprehensive_validation",
+                "description": "Schema for analyzing and validating customs declaration documents with invoice comparison, compliance checks, and processing statistics.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "success": { "type": "boolean" },
+                        "analysisType": { "type": "string" },
+                        "timestamp": { "type": "string", "description": "ISO formatted timestamp" },
+                        "projectInfo": {
+                            "type": "object",
+                            "properties": {
+                                "id": { "type": "string" },
+                                "title": { "type": "string" }
+                            },
+                            "required": []
+                        },
+                        "verificationChecklist": {
+                            "type": "object",
+                            "properties": {
+                                "matchedItems": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "field": { "type": "string" },
+                                            "value": { "type": "string" },
+                                            "invoiceValue": { "type": "string" },
+                                            "customDeclarationValue": { "type": "string" },
+                                            "status": { "type": "string" },
+                                            "priority": { "type": "string" }
+                                        },
+                                        "required": []
+                                    }
+                                },
+                                "unmatchedItems": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "field": { "type": "string" },
+                                            "invoiceValue": { "type": "string" },
+                                            "customDeclarationValue": { "type": "string" },
+                                            "status": { "type": "string" },
+                                            "priority": { "type": "string" },
+                                            "recommendation": { "type": "string" }
+                                        },
+                                        "required": []
+                                    }
+                                },
+                                "summary": {
+                                    "type": "object",
+                                    "properties": {
+                                        "totalChecked": { "type": "number" },
+                                        "matchedCount": { "type": "number" },
+                                        "unmatchedCount": { "type": "number" },
+                                        "missingCount": { "type": "number" },
+                                        "overallMatchScore": { "type": "number" }
+                                    },
+                                    "required": []
+                                }
+                            },
+                            "required": []
+                        },
+                        "customDeclarationAnalysis": {
+                            "type": "object",
+                            "properties": {
+                                "fileName": { "type": "string" },
+                                "declarationInfo": {
+                                    "type": "object",
+                                    "properties": {
+                                        "declarationNumber": { "type": "string" },
+                                        "declarationType": { "type": "string" },
+                                        "issueDate": { "type": "string" },
+                                        "validUntil": { "type": "string" },
+                                        "customsOffice": { "type": "string" }
+                                    },
+                                    "required": []
+                                },
+                                "originDestination": {
+                                    "type": "object",
+                                    "properties": {
+                                        "originCountry": { "type": "string" },
+                                        "originCity": { "type": "string" },
+                                        "destinationCountry": { "type": "string" },
+                                        "destinationCity": { "type": "string" },
+                                        "routeTransit": { "type": "string" }
+                                    },
+                                    "required": []
+                                },
+                                "partyInfo": {
+                                    "type": "object",
+                                    "properties": {
+                                        "consignor": { "type": "string" },
+                                        "consignee": { "type": "string" },
+                                        "shippingAgent": { "type": "string" },
+                                        "customsBroker": { "type": "string" }
+                                    },
+                                    "required": []
+                                },
+                                "items": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "itemIndex": { "type": "number" },
+                                            "description": { "type": "string" },
+                                            "hsCode": { "type": "string" },
+                                            "quantity": { "type": "string" },
+                                            "unit": { "type": "string" },
+                                            "weight": { "type": "string" },
+                                            "dimensions": { "type": "string" },
+                                            "value": { "type": "string" },
+                                            "totalValue": { "type": "string" },
+                                            "originCountry": { "type": "string" },
+                                            "purpose": { "type": "string" }
+                                        },
+                                        "required": []
+                                    }
+                                },
+                                "financialDetails": {
+                                    "type": "object",
+                                    "properties": {
+                                        "totalValue": { "type": "string" },
+                                        "currency": { "type": "string" },
+                                        "exchangeRate": { "type": "string" },
+                                        "duties": { "type": "string" },
+                                        "taxes": { "type": "string" },
+                                        "fees": { "type": "string" },
+                                        "grandTotal": { "type": "string" }
+                                    },
+                                    "required": []
+                                }
+                            },
+                            "required": []
+                        },
+                        "invoiceComparison": {
+                            "type": "object",
+                            "properties": {
+                                "matchedInvoices": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "invoiceId": { "type": "string" },
+                                            "fileName": { "type": "string" },
+                                            "correlationScore": { "type": "string" },
+                                            "addressValidation": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "billingAddressMatch": { "type": "boolean" },
+                                                    "shippingAddressMatch": { "type": "boolean" },
+                                                    "consigneeMatch": { "type": "boolean" },
+                                                    "addressDifferences": {
+                                                        "type": "array",
+                                                        "items": { "type": "string" }
+                                                    }
+                                                },
+                                                "required": []
+                                            },
+                                            "itemValidation": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "itemCountMatch": { "type": "boolean" },
+                                                    "quantityVariance": { "type": "string" },
+                                                    "weightVariance": { "type": "string" },
+                                                    "itemDifferences": {
+                                                        "type": "array",
+                                                        "items": { "type": "string" }
+                                                    }
+                                                },
+                                                "required": []
+                                            },
+                                            "financialValidation": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "totalCostVariance": { "type": "string" },
+                                                    "currencyMatch": { "type": "boolean" },
+                                                    "unitPriceDifferences": {
+                                                        "type": "array",
+                                                        "items": { "type": "string" }
+                                                    },
+                                                    "taxCalculationMatch": { "type": "boolean" }
+                                                },
+                                                "required": []
+                                            },
+                                            "matches": { "type": "array", "items": { "type": "string" } },
+                                            "discrepancies": { "type": "array", "items": { "type": "string" } },
+                                            "warnings": { "type": "array", "items": { "type": "string" } }
+                                        },
+                                        "required": []
+                                    }
+                                },
+                                "summary": {
+                                    "type": "object",
+                                    "properties": {
+                                        "totalInvoicesAnalyzed": { "type": "number" },
+                                        "successfulMatches": { "type": "number" },
+                                        "addressConsistencyScore": { "type": "string" },
+                                        "itemConsistencyScore": { "type": "string" },
+                                        "financialConsistencyScore": { "type": "string" },
+                                        "overallComplianceScore": { "type": "string" },
+                                        "criticalDiscrepancies": { "type": "number" },
+                                        "warnings": { "type": "number" },
+                                        "resolvedAutomatically": { "type": "number" },
+                                        "matchBreakdown": {
+                                            "type": "object",
+                                            "properties": {
+                                                "matched": { "type": "number" },
+                                                "unmatched": { "type": "number" },
+                                                "missing": { "type": "number" },
+                                                "percentage": { "type": "string" }
+                                            },
+                                            "required": []
+                                        }
+                                    },
+                                    "required": []
+                                }
+                            },
+                            "required": []
+                        },
+                        "complianceAssessment": {
+                            "type": "object",
+                            "properties": {
+                                "regulatoryCompliance": {
+                                    "type": "object",
+                                    "properties": {
+                                        "hsCodeAccuracy": { "type": "string" },
+                                        "countryOfOrigin": { "type": "string" },
+                                        "tradeAgreementEligibility": { "type": "string" },
+                                        "restrictedItemsCheck": { "type": "string" }
+                                    },
+                                    "required": []
+                                },
+                                "documentationCheck": {
+                                    "type": "object",
+                                    "properties": {
+                                        "requiredCertificates": {
+                                            "type": "array",
+                                            "items": { "type": "string" }
+                                        },
+                                        "missingDocuments": {
+                                            "type": "array",
+                                            "items": { "type": "string" }
+                                        },
+                                        "validityStatus": { "type": "string" }
+                                    },
+                                    "required": []
+                                },
+                                "riskFactors": { "type": "array", "items": { "type": "string" } }
+                            },
+                            "required": []
+                        },
+                        "validationResults": {
+                            "type": "object",
+                            "properties": {
+                                "dataAccuracy": { "type": "string" },
+                                "completenessScore": { "type": "string" },
+                                "consistencyCheck": { "type": "string" },
+                                "complianceStatus": { "type": "string" },
+                                "readyForSubmission": { "type": "boolean" },
+                                "requiresReview": { "type": "boolean" }
+                            },
+                            "required": []
+                        },
+                        "recommendations": {
+                            "type": "object",
+                            "properties": {
+                                "immediateActions": { "type": "array", "items": { "type": "string" } },
+                                "improvements": { "type": "array", "items": { "type": "string" } },
+                                "complianceActions": { "type": "array", "items": { "type": "string" } },
+                                "documentationUpdates": { "type": "array", "items": { "type": "string" } }
+                            },
+                            "required": []
+                        },
+                        "processingStats": {
+                            "type": "object",
+                            "properties": {
+                                "filesProcessed": { "type": "number" },
+                                "contentDataAnalyzed": { "type": "number" },
+                                "crossChecksPerformed": { "type": "number" },
+                                "analysisDuration": { "type": "string" },
+                                "timestamp": { "type": "string" }
+                            },
+                            "required": []
+                        }
+                    },
+                    "required": ["success", "analysisType"]
+                }
+            }
+
+
             // Prepare attachments array with available files
             const attachments = [];
 
-            // Add custom declaration file if openAIFileId is available
-            if (customDeclarationId) {
-                attachments.push({
-                    file_id: customDeclarationId,
-                    tools: [{ "type": "file_search" }]
-                });
-            }
 
-            // // Add invoice files if available
-            // invoices.forEach(invoice => {
-            //     if (invoice.openAIFileId) {
-            //         attachments.push({
-            //             file_id: invoice.openAIFileId,
-            //             tools: [{ "type": "file_search" }]
-            //         });
-            //     }
-            // });
-
-            console.log(`Prepared ${attachments.length} file attachments for custom declaration analysis`);
+            console.log(`Prepared ${attachments.length} file attachments for custom declaration analysis (1 custom declaration + ${invoices.length} invoices)`);
 
             // Add message to thread with attachments
             await this.addMessageToThread(threadId, analysisInstructions, attachments);
 
             // Create run for analysis
-            const run = await this.createRun(threadId, analysisInstructions);
+            const run = await this.createRun(threadId, analysisInstructions, 'custom_declaration', { responseFormat: { type: 'json_schema', json_schema: { name: customDeclarationComprehensiveValidationSchema.name, schema: customDeclarationComprehensiveValidationSchema.parameters } }, temperature: 0 });
 
             // Wait for completion
             const runStatus = await this.waitForRunCompletion(threadId, run.id);
@@ -1266,52 +1806,29 @@ Return only valid JSON.`;
 
             // Extract analysis response from AI
             const aiMessage = messages[0];
-            let analysisResult = null;
 
             if (aiMessage.content && aiMessage.content.length > 0) {
                 const responseText = aiMessage.content[0].text.value;
                 console.log('Raw AI response received for custom declaration analysis:', responseText.substring(0, 500) + '...');
 
-                analysisResult = this.extractJsonFromResponse(responseText);
-
-                if (!analysisResult) {
-                    // Fallback: create structured response from text
-                    analysisResult = {
-                        success: true,
-                        analysisType: "custom_declaration_comprehensive_validation",
-                        rawResponse: responseText,
-                        timestamp: new Date().toISOString(),
-                        projectInfo: analysisData.project,
-                        processingStats: analysisData
-                    };
-                }
+                return {
+                    success: true,
+                    analysisResult: JSON.parse(responseText)
+                };
             } else {
-                throw new Error('Invalid response format from AI');
+                return {
+                    success: false,
+                    error: 'Invalid response format from AI'
+                };
             }
 
-            console.log('✅ Comprehensive custom declaration analysis completed successfully');
-
-            return {
-                success: true,
-                analysisData: analysisResult,
-                analyzedAt: new Date().toISOString(),
-                filesAnalyzed: attachments.length,
-                invoiceCount: invoices.length,
-                projectId: project.id,
-                customDeclarationId: customDeclarationId
-            };
 
         } catch (error) {
             console.error('❌ Error in custom declaration analysis with existing files:', error);
 
             return {
                 success: false,
-                error: error.message,
-                analyzedAt: new Date().toISOString(),
-                filesAnalyzed: 0,
-                invoiceCount: 0,
-                projectId: project.id,
-                customDeclarationId: customDeclarationId
+                analysisResult: error.message,
             };
         }
     }
@@ -1516,7 +2033,7 @@ Focus on providing comprehensive, detailed analysis that will help users underst
             await this.addMessageToThread(threadId, analysisInstructions, attachments);
 
             // Create run for analysis
-            const run = await this.createRun(threadId, analysisInstructions);
+            const run = await this.createRun(threadId, analysisInstructions, 'custom_declaration');
 
             // Wait for completion
             const runStatus = await this.waitForRunCompletion(threadId, run.id);

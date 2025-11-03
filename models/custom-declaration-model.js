@@ -40,6 +40,14 @@ const CustomDeclaration = sequelize.define(
       type: DataTypes.STRING(100),
       allowNull: true,
     },
+    originalFileContent: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    translatedFileContent: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
     insights: {
       type: DataTypes.TEXT,
       allowNull: true,

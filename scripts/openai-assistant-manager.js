@@ -25,11 +25,11 @@ class OpenAIAssistantManager {
     async createAssistant(config = {}) {
         const defaultConfig = {
             name: "Invoice Translation Assistant",
-            description: "Professional assistant for translating invoices and comparing mismatches between original and translated invoices or between invoice and customs clearance documents.",
+            description: "Professional assistant for translating invoices and comparing mismatches between original and translated invoices",
             model: "gpt-4o-mini",
             instructions: `You are a professional invoice translation assistant with expertise in:
 
-1. **Invoice Translation**: Translate invoice data while maintaining original structure and formatting
+1. **Invoice Translation**: Translate invoice JSON data while maintaining original structure
 2. **Currency Conversion**: Convert currency values to specified format while preserving numerical accuracy
 3. **Document Comparison**: Compare information between original and translated invoices
 4. **Customs Clearance**: Compare invoice data with customs clearance documents
@@ -44,10 +44,7 @@ class OpenAIAssistantManager {
 
 **Output Format:**
 Always respond with valid JSON format containing the requested data structure.`,
-            tools: [
-                { type: "code_interpreter" },
-                { type: "file_search" }
-            ],
+            tools: [],
             metadata: {
                 created_by: "estrella-backend",
                 created_at: new Date().toISOString(),

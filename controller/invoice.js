@@ -8,6 +8,7 @@ const { translateDocument } = require("../services/doc-translation.service");
 const commonHelper = require("../helper/common-helper");
 const _ = require("lodash");
 const openAIHelper = require("../helper/openai-helper");
+const { extractInvoiceData } = require("../helper/invoice-helper");
 const controller = {
   // Create new invoice
   create: async function (req, res) {
@@ -38,7 +39,7 @@ const controller = {
 
       let originalFilePath = null;
 
-      console.log("req?.files", req?.files);
+
 
       if (req?.files && req?.files["files[]"]) {
         originalFilePath = req?.files["files[]"][0]?.path;
@@ -47,6 +48,10 @@ const controller = {
         data.originalFileName = req?.files["files[]"][0]?.filename;
       }
       data.originalFilePath = originalFilePath;
+
+      const originalFileContent = await extractInvoiceData(originalFilePath);
+      console.log("originalFileContent", originalFileContent);
+      data.originalFileContent = JSON.stringify(originalFileContent);
 
       // Convert GUIDs to actual IDs for foreign key constraints
       data.projectId = project.id;
@@ -145,7 +150,7 @@ const controller = {
         responseData
       );
     } catch (err) {
-      console.log("sdfsdfsdf", err);
+      console.log("Invoice getAll error", err);
       return sendResponseWithData(
         res,
         ErrorCode.REQUEST_FAILED,
@@ -480,7 +485,7 @@ const controller = {
         { where: { projectId: project.id } }
       );
       const projectInvoices = await Invoice.findAll({
-        where: { projectId: project.id },
+        where: { projectId: project.id, translatedFileContent: null },
       });
       // Create thread ID if it doesn't exist
       let threadId = project.aiConversation;
@@ -509,6 +514,7 @@ const controller = {
             id: invoice.id,
             originalFilePath: invoice.originalFilePath,
             originalFileName: invoice.originalFileName,
+            originalFileContent: invoice.originalFileContent,
             language: project.language,
             translatedLanguage: project.translatedLanguage,
             currency: project.currency,
