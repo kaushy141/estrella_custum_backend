@@ -42,7 +42,8 @@ class PZDocumentGeneratorService {
             // Fetch all invoices for the project
             const invoices = await Invoice.findAll({
                 where: { projectId, groupId },
-                order: [['createdAt', 'DESC']]
+                order: [['createdAt', 'DESC']],
+                raw: true
             });
 
             if (!invoices || invoices.length === 0) {
@@ -52,7 +53,8 @@ class PZDocumentGeneratorService {
             // Fetch latest custom declaration for the project
             const customDeclaration = await CustomDeclaration.findOne({
                 where: { projectId, groupId },
-                order: [['createdAt', 'DESC']]
+                order: [['createdAt', 'DESC']],
+                raw: true
             });
 
             if (!customDeclaration) {
@@ -60,53 +62,34 @@ class PZDocumentGeneratorService {
             }
 
             // Parse insights
-            let declarationInsights = {};
+            let declarationOriginalFileContent = {};
             try {
-                declarationInsights = JSON.parse(customDeclaration.insights || '{}');
+                declarationOriginalFileContent = JSON.parse(customDeclaration.originalFileContent || '{}');
             } catch (e) {
-                console.warn('Failed to parse custom declaration insights:', e);
+                console.warn('Failed to parse custom declaration original file content:', e);
             }
 
-            // Parse invoice insights
-            const invoiceData = invoices.map(invoice => {
-                let insights = {};
-                try {
-                    insights = JSON.parse(invoice.insights || '{}');
-                } catch (e) {
-                    console.warn(`Failed to parse insights for invoice ${invoice.id}:`, e);
-                }
+            // "description": " SZT., SL925 SREBRO CZ Stud Srebrny Żyd.",
+            //       "category": " PIERŚCIEŃ",
+            //       "grossWeight": 2.56,
+            //       "netWeight": 2.46,
+            //       "HSCode": 71131149,
+            //       "UOM": " PCS",
+            //       "quantity": 2,
+            //       "unitPrice": 22.5,
+            //       "total": 45
+            console.log(invoices);
 
-                let translatedContent = {};
-                try {
-                    translatedContent = JSON.parse(invoice.translatedFileContent || '{}');
-                } catch (e) {
-                    console.warn(`Failed to parse translated content for invoice ${invoice.id}:`, e);
-                }
-
-                return {
-                    id: invoice.id,
-                    guid: invoice.guid,
-                    originalFileName: invoice.originalFileName,
-                    translatedFileName: invoice.translatedFileName,
-                    insights: insights,
-                    translatedContent: translatedContent,
-                    createdAt: invoice.createdAt
-                };
-            });
-
-
-            //Generate AI PDF file for custom-clearance
-
-            // Process all invoices with OpenAI to extract detailed information
-            console.log('Extracting detailed invoice data using OpenAI...');
-            const detailedInvoiceData = await this.extractInvoiceDataWithAI(invoices);
-
-            // Aggregate all items from all invoices
-            const allItems = this.aggregateAllItems(detailedInvoiceData);
-
-            // Extract recipient and supplier information
-            const recipientInfo = this.extractRecipientInfo(detailedInvoiceData);
-            const supplierInfo = this.extractSupplierInfo(detailedInvoiceData);
+            const allItems = invoices.map(invoice => JSON.parse(invoice.originalFileContent).items).flat().map(item => ({
+                itemName: item.description,
+                unitQuantity: item.quantity,
+                netPrice: item.unitPrice,
+                rate: item.rate,
+                netValue: item.total,
+                grossValue: item.total
+            })).flat();
+            const recipientInfo = JSON.parse(invoices[0].originalFileContent).consignee;
+            const supplierInfo = JSON.parse(invoices[0].originalFileContent).merchantExporter;
 
             // Prepare output directory (similar to invoice translation pattern)
             const outputDir = path.join('media', 'declaration', customDeclaration.guid.substring(0, 1));
@@ -122,13 +105,11 @@ class PZDocumentGeneratorService {
                 project,
                 group,
                 customDeclaration,
-                declarationInsights,
-                invoices: invoiceData,
-                detailedInvoices: detailedInvoiceData,
+                declarationOriginalFileContent,
+                invoices: invoices,
                 allItems: allItems,
                 recipient: recipientInfo,
                 supplier: supplierInfo,
-                pzNumber: customDeclaration.guid,
                 issueDate: new Date().toLocaleDateString('pl-PL'),
                 warehouse: group.name || 'Default Warehouse'
             });
@@ -149,10 +130,10 @@ class PZDocumentGeneratorService {
 
             // Prepare insights summary
             const insights = JSON.stringify({
-                declarationInsights,
+                declarationOriginalFileContent,
                 invoiceSummary: {
                     totalInvoices: invoices.length,
-                    invoices: invoiceData.map(inv => ({
+                    invoices: invoices.map(inv => ({
                         id: inv.id,
                         fileName: inv.originalFileName,
                         translatedFileName: inv.translatedFileName
@@ -175,251 +156,6 @@ class PZDocumentGeneratorService {
         }
     }
 
-    /**
-     * Extract detailed invoice data using OpenAI
-     * @param {Array} invoices - Array of invoice records
-     * @returns {Promise<Array>} - Array of detailed invoice data
-     */
-    async extractInvoiceDataWithAI(invoices) {
-        const detailedData = [];
-
-        for (const invoice of invoices) {
-            try {
-                console.log(`Processing invoice ${invoice.id} with OpenAI...`);
-
-                // Check if we already have translated content
-                if (invoice.translatedFileContent) {
-                    try {
-                        const translatedContent = JSON.parse(invoice.translatedFileContent);
-                        if (translatedContent && translatedContent.items) {
-                            detailedData.push({
-                                invoiceId: invoice.id,
-                                fileName: invoice.originalFileName,
-                                recipient: translatedContent.buyer || translatedContent.recipient || {},
-                                supplier: translatedContent.seller || translatedContent.supplier || {},
-                                items: translatedContent.items || [],
-                                total: translatedContent.total,
-                                currency: translatedContent.currency
-                            });
-                            continue;
-                        }
-                    } catch (e) {
-                        console.warn(`Failed to parse translated content for invoice ${invoice.id}, will use AI extraction`);
-                    }
-                }
-
-                // If no translated content or parsing failed, extract from original file
-                const originalFilePath = invoice.originalFilePath;
-                if (!originalFilePath) {
-                    console.warn(`No original file path for invoice ${invoice.id}`);
-                    continue;
-                }
-
-                // Read the original file
-                const originalFilePathResolved = path.resolve(originalFilePath);
-                const fileBuffer = await fs.readFile(originalFilePathResolved);
-                const fileExtension = path.extname(originalFilePath).toLowerCase();
-
-                // Prepare prompt for OpenAI
-                const prompt = `Extract the following information from this invoice document:
-                
-1. Recipient/Buyer Information:
-   - Name
-   - Address (full address including street, city, postal code, country)
-   - Tax ID/VAT Number (if available)
-
-2. Supplier/Seller Information:
-   - Name
-   - Address (full address including street, city, postal code, country)
-   - Tax ID/VAT Number (if available)
-
-3. All Items/Products with:
-   - Item Name/Description
-   - Unit Quantity
-   - Net Price (price per unit)
-   - Rate/Tax Rate
-   - Net Value (total before tax)
-   - Gross Value (total after tax)
-
-4. Invoice Details:
-   - Total Amount
-   - Currency
-
-Return the data in JSON format with the following structure:
-{
-  "recipient": {
-    "name": "...",
-    "address": "...",
-    "taxId": "..."
-  },
-  "supplier": {
-    "name": "...",
-    "address": "...",
-    "taxId": "..."
-  },
-  "items": [
-    {
-      "itemName": "...",
-      "unitQuantity": "...",
-      "netPrice": "...",
-      "rate": "...",
-      "netValue": "...",
-      "grossValue": "..."
-    }
-  ],
-  "total": "...",
-  "currency": "..."
-}`;
-
-                // Call OpenAI API - handle PDFs differently
-                let response;
-
-                if (fileExtension === '.pdf') {
-                    // For PDFs, upload as file and use gpt-4o with file handling
-                    const fileStream = require('fs').createReadStream(originalFilePathResolved);
-                    const uploadedFile = await openai.files.create({
-                        file: fileStream,
-                        purpose: 'assistants'
-                    });
-
-                    // Use assistants API for PDF processing
-                    response = await openai.chat.completions.create({
-                        model: "gpt-4o",
-                        messages: [
-                            {
-                                role: "user",
-                                content: prompt + `\n\nFile ID: ${uploadedFile.id}`
-                            }
-                        ],
-                        response_format: { type: "json_object" }
-                    });
-
-                    // Clean up uploaded file
-                    try {
-                        await openai.files.del(uploadedFile.id);
-                    } catch (e) {
-                        console.warn('Failed to delete uploaded file:', e);
-                    }
-                } else {
-                    // For images (xlsx, jpg, png, etc.), use vision API
-                    const fileBase64 = fileBuffer.toString('base64');
-                    const mimeType = fileExtension === '.xlsx' || fileExtension === '.xls' ? 'image/png' : 'image/jpeg';
-
-                    response = await openai.chat.completions.create({
-                        model: "gpt-4o",
-                        messages: [
-                            {
-                                role: "user",
-                                content: [
-                                    {
-                                        type: "text",
-                                        text: prompt
-                                    },
-                                    {
-                                        type: "image_url",
-                                        image_url: {
-                                            url: `data:${mimeType};base64,${fileBase64}`
-                                        }
-                                    }
-                                ]
-                            }
-                        ],
-                        response_format: { type: "json_object" }
-                    });
-                }
-
-                const extractedData = JSON.parse(response.choices[0].message.content);
-
-                detailedData.push({
-                    invoiceId: invoice.id,
-                    fileName: invoice.originalFileName,
-                    recipient: extractedData.recipient || {},
-                    supplier: extractedData.supplier || {},
-                    items: extractedData.items || [],
-                    total: extractedData.total,
-                    currency: extractedData.currency
-                });
-
-                console.log(`✅ Successfully extracted data from invoice ${invoice.id}`);
-
-            } catch (error) {
-                console.error(`Error processing invoice ${invoice.id}:`, error);
-                // Add empty data to maintain order
-                detailedData.push({
-                    invoiceId: invoice.id,
-                    fileName: invoice.originalFileName,
-                    recipient: {},
-                    supplier: {},
-                    items: [],
-                    total: null,
-                    currency: null,
-                    error: error.message
-                });
-            }
-        }
-
-        return detailedData;
-    }
-
-    /**
-     * Aggregate all items from all invoices
-     * @param {Array} detailedInvoices - Array of detailed invoice data
-     * @returns {Array} - Aggregated list of all items
-     */
-    aggregateAllItems(detailedInvoices) {
-        const allItems = [];
-
-        detailedInvoices.forEach((invoice, invoiceIndex) => {
-            if (invoice.items && Array.isArray(invoice.items)) {
-                invoice.items.forEach(item => {
-                    allItems.push({
-                        ...item,
-                        invoiceId: invoice.invoiceId,
-                        invoiceFileName: invoice.fileName,
-                        invoiceNumber: invoiceIndex + 1
-                    });
-                });
-            }
-        });
-
-        return allItems;
-    }
-
-    /**
-     * Extract recipient information (use first invoice with data)
-     * @param {Array} detailedInvoices - Array of detailed invoice data
-     * @returns {Object} - Recipient information
-     */
-    extractRecipientInfo(detailedInvoices) {
-        for (const invoice of detailedInvoices) {
-            if (invoice.recipient && invoice.recipient.name) {
-                return invoice.recipient;
-            }
-        }
-        return {
-            name: 'Not Available',
-            address: 'Not Available',
-            taxId: 'Not Available'
-        };
-    }
-
-    /**
-     * Extract supplier information (use first invoice with data)
-     * @param {Array} detailedInvoices - Array of detailed invoice data
-     * @returns {Object} - Supplier information
-     */
-    extractSupplierInfo(detailedInvoices) {
-        for (const invoice of detailedInvoices) {
-            if (invoice.supplier && invoice.supplier.name) {
-                return invoice.supplier;
-            }
-        }
-        return {
-            name: 'Not Available',
-            address: 'Not Available',
-            taxId: 'Not Available'
-        };
-    }
 
     /**
      * Create PDF document with proper formatting
@@ -492,23 +228,23 @@ Return the data in JSON format with the following structure:
         // Recipient (Left side)
         doc.text('ODBIORCA / RECIPIENT:', leftMargin, startY, { continued: false });
         doc.fontSize(9).font('Helvetica-Bold');
-        doc.text(recipient.name || 'N/A', leftMargin, doc.y);
+        doc.text(recipient || 'N/A', leftMargin, doc.y);
         doc.fontSize(8).font('Helvetica');
-        doc.text(recipient.address || 'N/A', leftMargin, doc.y, { width: 200 });
-        if (recipient.taxId) {
-            doc.text(`NIP/VAT: ${recipient.taxId}`, leftMargin, doc.y);
-        }
+        //doc.text(recipient.address || 'N/A', leftMargin, doc.y, { width: 200 });
+        //if (recipient.taxId) {
+        //    doc.text(`NIP/VAT: ${recipient.taxId}`, leftMargin, doc.y);
+        //}
 
         // Supplier (Right side)
         const supplierY = startY;
         doc.text('DOSTAWCA / SUPPLIER:', rightMargin, supplierY, { continued: false });
         doc.fontSize(9).font('Helvetica-Bold');
-        doc.text(supplier.name || 'N/A', rightMargin, doc.y);
+        doc.text(supplier || 'N/A', rightMargin, doc.y);
         doc.fontSize(8).font('Helvetica');
-        doc.text(supplier.address || 'N/A', rightMargin, doc.y, { width: 200 });
-        if (supplier.taxId) {
-            doc.text(`NIP/VAT: ${supplier.taxId}`, rightMargin, doc.y);
-        }
+        //doc.text(supplier.address || 'N/A', rightMargin, doc.y, { width: 200 });
+        //if (supplier.taxId) {
+        //    doc.text(`NIP/VAT: ${supplier.taxId}`, rightMargin, doc.y);
+        //}
 
         // Move to max Y of both columns
         const maxY = Math.max(doc.y, supplierY + 60);
@@ -543,6 +279,7 @@ Return the data in JSON format with the following structure:
      */
     addItemsTable(doc, data) {
         const { allItems } = data;
+        console.log("allItems", allItems);
 
         if (!allItems || allItems.length === 0) {
             doc.fontSize(11).font('Helvetica');
@@ -558,7 +295,7 @@ Return the data in JSON format with the following structure:
         // Column widths
         const col = {
             no: 30,
-            itemName: 150,
+            itemName: 180,
             quantity: 50,
             netPrice: 60,
             rate: 40,
@@ -594,7 +331,7 @@ Return the data in JSON format with the following structure:
                 this.drawPageHeader(doc, data.recipient, data.supplier, data.pzNumber, data.issueDate, data.warehouse);
 
                 // Re-draw table header
-                doc.fontSize(8).font('Helvetica-Bold');
+                doc.fontSize(10).font('Helvetica-Bold');
                 const newTableTop = doc.y;
                 doc.text('Lp.', leftMargin, newTableTop, { width: col.no, continued: false });
                 doc.text('Nazwa towaru / Item Name', leftMargin + col.no, newTableTop, { width: col.itemName, continued: false });
@@ -604,12 +341,12 @@ Return the data in JSON format with the following structure:
                 doc.text('Wart. netto / Net Value', leftMargin + col.no + col.itemName + col.quantity + col.netPrice + col.rate, newTableTop, { width: col.netValue, continued: false });
                 doc.text('Wart. brutto / Gross Value', leftMargin + col.no + col.itemName + col.quantity + col.netPrice + col.rate + col.netValue, newTableTop, { width: col.grossValue, continued: false });
 
-                doc.moveDown(0.3);
+                doc.moveDown(0.5);
                 const newLineY = doc.y;
                 doc.moveTo(leftMargin, newLineY)
                     .lineTo(550, newLineY)
                     .stroke();
-                doc.moveDown(0.3);
+                doc.moveDown(0.5);
                 doc.font('Helvetica').fontSize(7);
             }
 
