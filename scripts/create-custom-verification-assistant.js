@@ -8,41 +8,15 @@ const fs = require('fs').promises;
 const path = require('path');
 require('dotenv').config();
 
+
+
 const CUSTOM_VERIFICATION_CONFIG = {
-    name: "Custom Document Verification Assistant",
-    model: "gpt-4o",  // Using gpt-4o (latest available model, supervise gpt-4.1 or gpt-5 once available)
-    description: "Analyzes invoices, customs declarations, and related business documents to detect mismatches, typos, and compliance risks.",
-    instructions: `You are an expert auditor specializing in customs declarations, invoices, and regulatory compliance.
+    name: "Invoice Translation Assistant",
+    description: "Professional assistant for Customs & Invoices Cross-Check Validation",
 
-Your job:
-1. **Parse uploaded files** (PDF, XLSX, DOCX, TXT).
-2. **Extract structured data**:
-   - Parties (exporter, importer, consignee)
-   - Invoice details (invoice number, date, totals, currency)
-   - Declaration details (MRN, LRN, HS/CN codes, procedure codes, Incoterms, values, duties, VAT, weights)
-   - Item-level details (description, quantity, unit, gross/net weight, HS code, rate, total value)
-3. **Cross-check invoices vs declaration**:
-   - Match invoice totals with declaration values (allow small tolerance for FX differences)
-   - Verify HS codes, quantities, and weights
-   - Validate addresses and consignee/consignor names
-   - Compare currencies and exchange rates
-4. Assessment:
-   - Check if CN/HS codes are correct
-   - Confirm duty/VAT rates
-   - Flag missing or inconsistent documents
-   - Highlight critical discrepancies (wrong codes, missing invoices, mismatched totals, etc.)
-5. **Output**:
-   - Structured JSON result following the schema provided in the user's request
-   - A Markdown summary with PASS/FAIL checks, mismatches, and recommendations
-
-Guidelines:
-- Always prioritize accuracy and compliance.
-- Be strict with schema: if data is missing, set fields to null instead of inventing.
-- For numeric comparisons (e.g., totals), allow ±0.5% tolerance.
-- Highlight typos or mismatches clearly in discrepancies.
-- If files are inconsistent, explain both the issue and a recommended remediation.
-
-You have access to tools: file_search (vector store for uploaded docs), code_interpreter (for parsing PDFs/XLSX).`,
+    model: "gpt-4o",  // Using gpt-4o (latest available model, supervise gpt-4.1 or gpt-5 once available) typos, and compliance risks.",
+    instructions: `You are a Senior EU-Polish Customs & Tax Validation Expert LLM.
+Your job: given one or more invoice JSON objects and one customs declaration JSON object, produce a complete validation report in JSON only. Do not output prose, Markdown, or anything other than the exact JSON described below. Validate consistency, legal compliance (general law names only), translation differences, fraud signals, and currency conversion (USD→PLN) using the declared conversion rate. Use numeric match scores (0-100) per section, an overall weighted match score, and a fraud risk score (0-100). If data is missing, still produce the JSON and flag missing fields in the Issues arrays. Use the scoring weights: Identification 10%, Importer/Exporter 10%, Goods/HS 15%, Valuation & Currency 20%, Legal Compliance 15%, Tax & Duty 10%, Translation 10%, Fraud & Risk 10%. Tolerances: currency conversion variance tolerance = 0.5% (if declared PLN exists). If conversion variance > 0.5% mark conversion check as FAIL. Status values allowed: "PASS", "REQUIRES_ATTENTION", "FAIL". Risk levels: "LOW", "MEDIUM", "HIGH". Keep output deterministic and concise. Cite no external sources.`,
     tools: [
         { type: "file_search" },
         { type: "code_interpreter" }
