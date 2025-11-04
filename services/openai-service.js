@@ -2,6 +2,7 @@ const OpenAI = require('openai');
 const { toFile } = require('openai');
 const { CustomDeclaration } = require('../models/custom-declaration-model');
 const path = require('path');
+const _ = require('lodash');
 require('dotenv').config();
 
 class OpenAIService {
@@ -1416,7 +1417,42 @@ From Registration Declaration Part II:
         try {
             console.log(`Starting comprehensive custom declaration analysis with existing files for project...`);
 
-            const analysisInstructions = `You are analyzing a custom declaration (ZC document) against invoice data for comprehensive customs validation and accuracy verification.
+            const analysisInstructions = `{
+  "invoices": [ ${_.map(invoices, "originalFileContent").join('\n')} ],
+  "declaration": { ${customDeclaration.originalFileContent} },
+  "config": {
+    "currencyConversionTolerancePercent": 0.5,
+    "supportedLanguages": ["pl","en","hi","de"]
+    "invoiceCurrency": "${project.currency}"
+    "exchangeCurrency": "${project.exchangeCurrency}"
+    "declarationConversionRate": "${project.exchangeRate}"
+    "declarationConversionRateTolerancePercent": 0.5
+    "declarationConversionRateTolerance": 0.5
+    "declarationConversionRateTolerance": 0.5
+  }
+}
+You are analyzing a custom declaration (ZC document) against invoice data for comprehensive customs validation and accuracy verification.
+
+Validation requirements (must be implemented by the LLM):
+
+Identification: match invoice numbers, MRN, LRN, and dates. Flag missing or inconsistent IDs.
+
+Importer/Exporter: match importer/exporter names, NIP/EORI. Flag mismatches.
+
+Goods & HS: match invoice item HS/HSN codes vs declaration CN/TARIC; check quantity, gross/net weight consistency; flag mismatches.
+
+Valuation & Currency: determine authoritative invoice USD total (prefer declaration Invoice_value if currency=USD else sum invoice items). Use provided conversion rate (invoice.conversionRate OR declaration.Registration_Declaration_Part_II.Currency_Exchange_Rate) to compute recalculatedPLN = invoiceUSD * conversionRate. If declaration contains a PLN/statistical/tax base value, compute variancePercent = |recalculatedPLN - declaredPLN| / declaredPLN * 100. If variancePercent > currencyConversionTolerancePercent then mark conversion FAIL. Include ConversionRate_Declared, ConversionRate_Recalculated and ConversionVariancePercent.
+
+Legal & Compliance: check presence and consistency of Valuation method, Procedure type, Incoterms, Country of origin. Return boolean flags for compliance with: EU_Customs_Code, Polish_Customs_Act, Polish_VAT_Act (human readable — true/false based on checks, not article numbers).
+
+Tax & Duty: recompute VAT/duty where tax block present: validate Base x Rate ≈ Sum within 0.5% tolerance.
+
+Translation: for multilingual documents, compare main descriptions and flag translation mismatches or missing language versions.
+
+Fraud & Risk: produce a Risk_Score (0-100) and Risk_Level. Heuristics that increase risk: missing MRN, HS mismatches, conversion variance > tolerance, freight/insurance extremely high vs goods value, duplicate MRN/LRN.
+
+Produce both per-section Match_Score (0-100), Status, Issues[], Comments and an Overall_Match_Score (weighted), Overall_Status, Overall_Risk_Level and Remarks.
+
 Task:
 **Custom Declaration Data:**
 ${customDeclaration.originalFileContent}
@@ -1460,317 +1496,96 @@ ${invoices.map(invoice => invoice.originalFileContent).join('\n')}
    - Required certifications and permits
    - Trade agreement applicability
 
+Scoring rules (for the LLM to follow)
+
+- Scoring ranges: 0-100. 100 = perfect match, 0 = completely mismatch.
+- Use the supplied WEIGHTS for overall weighted score. Weighted average = sum(sectionScore * weight) / sum(weights).
+- Status thresholds:
+- PASS = section score = 100
+- REQUIRES_ATTENTION = section score in [threshold_attention, 99] (policy: attention threshold = 70 for most; 75 for HS and Legal)
+- FAIL = below attention threshold
+Currency conversion tolerance: 0.5% (configurable via config.currencyConversionTolerancePercent). If no declared PLN value present, mark conversion check REQUIRES_ATTENTION and preserve recalculatedPLN for review.
 Follow these rules:
-
-
-**VERIFICATION CHECKLIST REQUIREMENT:**
-Your analysis MUST include a comprehensive checklist with:
-- ✅ MATCHED items between custom declaration and invoice
-- ❌ UNMATCHED/MISMATCHED items that need attention
-- ⚠️ WARNINGS for potential issues
-- 📋 Priority ranking (Critical, High, Medium, Low)
-
-**Response Format Requirements:**
-Provide a comprehensive JSON response with the following structure:
-
-
-**Analysis Guidelines:**
-- Prioritize customs compliance and regulatory accuracy
-- Provide detailed quantitative assessments for all validations
-- Highlight critical discrepancies that could cause customs delays or rejection
-- Suggest specific remediation steps for identified issues
-
-Focus on providing comprehensive customs validation that ensures accurate documentation and compliance readiness.
-Return only valid JSON.`;
+- Focus on providing comprehensive customs validation that ensures accurate documentation and compliance readiness.
+- Return only valid JSON.`;
 
             const customDeclarationComprehensiveValidationSchema = {
                 "name": "custom_declaration_comprehensive_validation",
-                "description": "Schema for analyzing and validating customs declaration documents with invoice comparison, compliance checks, and processing statistics.",
+                "description": "Validates a custom declaration (ZC document) against invoice data for comprehensive customs validation and accuracy verification.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "success": { "type": "boolean" },
-                        "analysisType": { "type": "string" },
-                        "timestamp": { "type": "string", "description": "ISO formatted timestamp" },
-                        "projectInfo": {
-                            "type": "object",
-                            "properties": {
-                                "id": { "type": "string" },
-                                "title": { "type": "string" }
-                            },
-                            "required": []
+                        "ValidationSummary": {
+                            "Overall_Match_Score": 0.0,
+                            "Overall_Status": "PASS|REQUIRES_ATTENTION|FAIL",
+                            "Overall_Risk_Level": "LOW|MEDIUM|HIGH",
+                            "Remarks": "short human readable summary"
                         },
-                        "verificationChecklist": {
-                            "type": "object",
-                            "properties": {
-                                "matchedItems": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "field": { "type": "string" },
-                                            "value": { "type": "string" },
-                                            "invoiceValue": { "type": "string" },
-                                            "customDeclarationValue": { "type": "string" },
-                                            "status": { "type": "string" },
-                                            "priority": { "type": "string" }
-                                        },
-                                        "required": []
-                                    }
-                                },
-                                "unmatchedItems": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "field": { "type": "string" },
-                                            "invoiceValue": { "type": "string" },
-                                            "customDeclarationValue": { "type": "string" },
-                                            "status": { "type": "string" },
-                                            "priority": { "type": "string" },
-                                            "recommendation": { "type": "string" }
-                                        },
-                                        "required": []
-                                    }
-                                },
-                                "summary": {
-                                    "type": "object",
-                                    "properties": {
-                                        "totalChecked": { "type": "number" },
-                                        "matchedCount": { "type": "number" },
-                                        "unmatchedCount": { "type": "number" },
-                                        "missingCount": { "type": "number" },
-                                        "overallMatchScore": { "type": "number" }
-                                    },
-                                    "required": []
-                                }
+                        "Sections": {
+                            "Identification_Check": {
+                                "Match_Score": 0.0,
+                                "Status": "PASS|REQUIRES_ATTENTION|FAIL",
+                                "Issues": ["..."],
+                                "Comments": "..."
                             },
-                            "required": []
+                            "Importer_Exporter_Details": {
+                                "Match_Score": 0.0,
+                                "Status": "PASS|REQUIRES_ATTENTION|FAIL",
+                                "Issues": ["..."],
+                                "Comments": "..."
+                            },
+                            "Goods_and_HSCode_Validation": {
+                                "Match_Score": 0.0,
+                                "Status": "PASS|REQUIRES_ATTENTION|FAIL",
+                                "Issues": ["..."],
+                                "Comments": "..."
+                            },
+                            "Valuation_and_Currency_Conversion_Check": {
+                                "Match_Score": 0.0,
+                                "Status": "PASS|REQUIRES_ATTENTION|FAIL",
+                                "Issues": ["..."],
+                                "ConversionRate_Declared": 0.0,
+                                "ConversionRate_Recalculated": 0.0,
+                                "ConversionVariancePercent": 0.0,
+                                "Comments": "..."
+                            },
+                            "Legal_and_Compliance_Check": {
+                                "Match_Score": 0.0,
+                                "Status": "PASS|REQUIRES_ATTENTION|FAIL",
+                                "Issues": ["..."],
+                                "Legal_References": ["EU Customs Code", "Polish Customs Act", "Polish VAT Act"],
+                                "Comments": "...",
+                                "EU_Customs_Code_Compliance": true,
+                                "Polish_Customs_Act_Compliance": true,
+                                "VAT_Act_Compliance": true
+                            },
+                            "Tax_and_Duty_Validation": {
+                                "Match_Score": 0.0,
+                                "Status": "PASS|REQUIRES_ATTENTION|FAIL",
+                                "Issues": ["..."],
+                                "Comments": "..."
+                            },
+                            "Translation_and_Description_Check": {
+                                "Match_Score": 0.0,
+                                "Status": "PASS|REQUIRES_ATTENTION|FAIL",
+                                "Issues": ["..."],
+                                "Comments": "..."
+                            },
+                            "Fraud_and_Risk_Assessment": {
+                                "Match_Score": 0.0,
+                                "Status": "PASS|REQUIRES_ATTENTION|FAIL",
+                                "Risk_Score": 0,
+                                "Risk_Level": "LOW|MEDIUM|HIGH",
+                                "Anomalies": ["..."],
+                                "Comments": "..."
+                            }
                         },
-                        "customDeclarationAnalysis": {
-                            "type": "object",
-                            "properties": {
-                                "fileName": { "type": "string" },
-                                "declarationInfo": {
-                                    "type": "object",
-                                    "properties": {
-                                        "declarationNumber": { "type": "string" },
-                                        "declarationType": { "type": "string" },
-                                        "issueDate": { "type": "string" },
-                                        "validUntil": { "type": "string" },
-                                        "customsOffice": { "type": "string" }
-                                    },
-                                    "required": []
-                                },
-                                "originDestination": {
-                                    "type": "object",
-                                    "properties": {
-                                        "originCountry": { "type": "string" },
-                                        "originCity": { "type": "string" },
-                                        "destinationCountry": { "type": "string" },
-                                        "destinationCity": { "type": "string" },
-                                        "routeTransit": { "type": "string" }
-                                    },
-                                    "required": []
-                                },
-                                "partyInfo": {
-                                    "type": "object",
-                                    "properties": {
-                                        "consignor": { "type": "string" },
-                                        "consignee": { "type": "string" },
-                                        "shippingAgent": { "type": "string" },
-                                        "customsBroker": { "type": "string" }
-                                    },
-                                    "required": []
-                                },
-                                "items": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "itemIndex": { "type": "number" },
-                                            "description": { "type": "string" },
-                                            "hsCode": { "type": "string" },
-                                            "quantity": { "type": "string" },
-                                            "unit": { "type": "string" },
-                                            "weight": { "type": "string" },
-                                            "dimensions": { "type": "string" },
-                                            "value": { "type": "string" },
-                                            "totalValue": { "type": "string" },
-                                            "originCountry": { "type": "string" },
-                                            "purpose": { "type": "string" }
-                                        },
-                                        "required": []
-                                    }
-                                },
-                                "financialDetails": {
-                                    "type": "object",
-                                    "properties": {
-                                        "totalValue": { "type": "string" },
-                                        "currency": { "type": "string" },
-                                        "exchangeRate": { "type": "string" },
-                                        "duties": { "type": "string" },
-                                        "taxes": { "type": "string" },
-                                        "fees": { "type": "string" },
-                                        "grandTotal": { "type": "string" }
-                                    },
-                                    "required": []
-                                }
-                            },
-                            "required": []
-                        },
-                        "invoiceComparison": {
-                            "type": "object",
-                            "properties": {
-                                "matchedInvoices": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "invoiceId": { "type": "string" },
-                                            "fileName": { "type": "string" },
-                                            "correlationScore": { "type": "string" },
-                                            "addressValidation": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "billingAddressMatch": { "type": "boolean" },
-                                                    "shippingAddressMatch": { "type": "boolean" },
-                                                    "consigneeMatch": { "type": "boolean" },
-                                                    "addressDifferences": {
-                                                        "type": "array",
-                                                        "items": { "type": "string" }
-                                                    }
-                                                },
-                                                "required": []
-                                            },
-                                            "itemValidation": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "itemCountMatch": { "type": "boolean" },
-                                                    "quantityVariance": { "type": "string" },
-                                                    "weightVariance": { "type": "string" },
-                                                    "itemDifferences": {
-                                                        "type": "array",
-                                                        "items": { "type": "string" }
-                                                    }
-                                                },
-                                                "required": []
-                                            },
-                                            "financialValidation": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "totalCostVariance": { "type": "string" },
-                                                    "currencyMatch": { "type": "boolean" },
-                                                    "unitPriceDifferences": {
-                                                        "type": "array",
-                                                        "items": { "type": "string" }
-                                                    },
-                                                    "taxCalculationMatch": { "type": "boolean" }
-                                                },
-                                                "required": []
-                                            },
-                                            "matches": { "type": "array", "items": { "type": "string" } },
-                                            "discrepancies": { "type": "array", "items": { "type": "string" } },
-                                            "warnings": { "type": "array", "items": { "type": "string" } }
-                                        },
-                                        "required": []
-                                    }
-                                },
-                                "summary": {
-                                    "type": "object",
-                                    "properties": {
-                                        "totalInvoicesAnalyzed": { "type": "number" },
-                                        "successfulMatches": { "type": "number" },
-                                        "addressConsistencyScore": { "type": "string" },
-                                        "itemConsistencyScore": { "type": "string" },
-                                        "financialConsistencyScore": { "type": "string" },
-                                        "overallComplianceScore": { "type": "string" },
-                                        "criticalDiscrepancies": { "type": "number" },
-                                        "warnings": { "type": "number" },
-                                        "resolvedAutomatically": { "type": "number" },
-                                        "matchBreakdown": {
-                                            "type": "object",
-                                            "properties": {
-                                                "matched": { "type": "number" },
-                                                "unmatched": { "type": "number" },
-                                                "missing": { "type": "number" },
-                                                "percentage": { "type": "string" }
-                                            },
-                                            "required": []
-                                        }
-                                    },
-                                    "required": []
-                                }
-                            },
-                            "required": []
-                        },
-                        "complianceAssessment": {
-                            "type": "object",
-                            "properties": {
-                                "regulatoryCompliance": {
-                                    "type": "object",
-                                    "properties": {
-                                        "hsCodeAccuracy": { "type": "string" },
-                                        "countryOfOrigin": { "type": "string" },
-                                        "tradeAgreementEligibility": { "type": "string" },
-                                        "restrictedItemsCheck": { "type": "string" }
-                                    },
-                                    "required": []
-                                },
-                                "documentationCheck": {
-                                    "type": "object",
-                                    "properties": {
-                                        "requiredCertificates": {
-                                            "type": "array",
-                                            "items": { "type": "string" }
-                                        },
-                                        "missingDocuments": {
-                                            "type": "array",
-                                            "items": { "type": "string" }
-                                        },
-                                        "validityStatus": { "type": "string" }
-                                    },
-                                    "required": []
-                                },
-                                "riskFactors": { "type": "array", "items": { "type": "string" } }
-                            },
-                            "required": []
-                        },
-                        "validationResults": {
-                            "type": "object",
-                            "properties": {
-                                "dataAccuracy": { "type": "string" },
-                                "completenessScore": { "type": "string" },
-                                "consistencyCheck": { "type": "string" },
-                                "complianceStatus": { "type": "string" },
-                                "readyForSubmission": { "type": "boolean" },
-                                "requiresReview": { "type": "boolean" }
-                            },
-                            "required": []
-                        },
-                        "recommendations": {
-                            "type": "object",
-                            "properties": {
-                                "immediateActions": { "type": "array", "items": { "type": "string" } },
-                                "improvements": { "type": "array", "items": { "type": "string" } },
-                                "complianceActions": { "type": "array", "items": { "type": "string" } },
-                                "documentationUpdates": { "type": "array", "items": { "type": "string" } }
-                            },
-                            "required": []
-                        },
-                        "processingStats": {
-                            "type": "object",
-                            "properties": {
-                                "filesProcessed": { "type": "number" },
-                                "contentDataAnalyzed": { "type": "number" },
-                                "crossChecksPerformed": { "type": "number" },
-                                "analysisDuration": { "type": "string" },
-                                "timestamp": { "type": "string" }
-                            },
-                            "required": []
+                        "Legal_Check_Summary": {
+                            "EU_Customs_Code_Compliance": true,
+                            "Polish_Customs_Act_Compliance": true,
+                            "VAT_Act_Compliance": true
                         }
-                    },
-                    "required": ["success", "analysisType"]
+                    }
                 }
             }
 

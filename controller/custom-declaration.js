@@ -42,7 +42,8 @@ const controller = {
       // Handle the promise to avoid unhandled promise rejection
       analysisPromise
         .then(async (result) => {
-          console.log(`Custom declaration analysis completed for custom declaration:`, result);
+          console.log(`Custom declaration analysis completed for custom declaration:`);
+          console.dir(result, { depth: null });
 
           // Check if insights were updated
           if (result.success && result.analysisResult) {
