@@ -49,8 +49,9 @@ const controller = {
       }
       data.originalFilePath = originalFilePath;
 
+      console.log("Starting data extraction from the original file", originalFilePath);
       const originalFileContent = await extractInvoiceData(originalFilePath);
-      console.log("originalFileContent", originalFileContent);
+      //console.log("originalFileContent", originalFileContent);
       data.originalFileContent = JSON.stringify(originalFileContent);
 
       // Convert GUIDs to actual IDs for foreign key constraints

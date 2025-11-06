@@ -4,156 +4,162 @@ const path = require('path');
 const fs = require('fs/promises');
 
 const extractInvoiceData = async (filePath) => {
-    const xlsxHelper = new XlsxHelper();
-    await xlsxHelper.load(filePath);
+    try {
+        const xlsxHelper = new XlsxHelper();
+        await xlsxHelper.load(filePath);
 
-    // Change these to the exact cells for your file (below are generic guesses, replace if you know the correct layout)
-    const invoiceNumber = xlsxHelper.getCellValue('F4');
-    const date = xlsxHelper.getCellValue('F4');
-    const exportReference = xlsxHelper.getCellValue('I4');
-    const merchantExporter = xlsxHelper.getCellValue('A4');
-    const consignee = xlsxHelper.getCellValue('A10');
-    const buyer = xlsxHelper.getCellValue('F10');
-    const preCarriageBy = xlsxHelper.getCellValue('A18');
-    const placeOfReceipt = xlsxHelper.getCellValue('C18');
-    const vesselNumber = xlsxHelper.getCellValue('A20');
-    const portOfLoading = xlsxHelper.getCellValue('C20');
-    const portOfDischarge = xlsxHelper.getCellValue('A22');
-    const finalDestination = xlsxHelper.getCellValue('A22');
-    const countryOfOriginOfGoods = xlsxHelper.getCellValue('F17');
-    const countryOfFinalDestination = xlsxHelper.getCellValue('C22');
-    const terms = xlsxHelper.getCellValue('G20');
-    const bankerName = xlsxHelper.getCellValue('G21');
-    const bankerAddress = xlsxHelper.getCellValue('G22');
-    const bankerAccountDetails = xlsxHelper.getCellValue('F23');
+        // Change these to the exact cells for your file (below are generic guesses, replace if you know the correct layout)
+        const invoiceNumber = xlsxHelper.getCellValue('F4');
+        const date = xlsxHelper.getCellValue('F4');
+        const exportReference = xlsxHelper.getCellValue('I4');
+        const merchantExporter = xlsxHelper.getCellValue('A4');
+        const consignee = xlsxHelper.getCellValue('A10');
+        const buyer = xlsxHelper.getCellValue('F10');
+        const preCarriageBy = xlsxHelper.getCellValue('A18');
+        const placeOfReceipt = xlsxHelper.getCellValue('C18');
+        const vesselNumber = xlsxHelper.getCellValue('A20');
+        const portOfLoading = xlsxHelper.getCellValue('C20');
+        const portOfDischarge = xlsxHelper.getCellValue('A22');
+        const finalDestination = xlsxHelper.getCellValue('A22');
+        const countryOfOriginOfGoods = xlsxHelper.getCellValue('F17');
+        const countryOfFinalDestination = xlsxHelper.getCellValue('C22');
+        const terms = xlsxHelper.getCellValue('G20');
+        const bankerName = xlsxHelper.getCellValue('G21');
+        const bankerAddress = xlsxHelper.getCellValue('G22');
+        const bankerAccountDetails = xlsxHelper.getCellValue('F23');
 
-    const packagingDetails = xlsxHelper.getCellValue('B25');
-    invoiceHSNCode = xlsxHelper.getCellValue('C25');
-    const itemsDescription = xlsxHelper.getCellValue('B26');
+        const packagingDetails = xlsxHelper.getCellValue('B25');
+        invoiceHSNCode = xlsxHelper.getCellValue('C25');
+        const itemsDescription = xlsxHelper.getCellValue('B26');
 
-    const itemsHeaderLabelRate = xlsxHelper.getCellValue('I24');
-    const itemsHeaderLabelAmount = xlsxHelper.getCellValue('J24');
-    // Items (dynamic): Start from row 29, read columns A-D for each row (description, quantity, unitPrice, total) until description is empty
-    const items = [];
-    let row = 29;
-    while (true) {
-        const description = xlsxHelper.getCellValue(`A${row}`);
-        if (description === undefined || description === null || description === "") break;
-        const category = xlsxHelper.getCellValue(`C${row}`);
-        const grossWeight = xlsxHelper.getCellValue(`D${row}`);
-        const netWeight = xlsxHelper.getCellValue(`E${row}`);
-        const HSCode = xlsxHelper.getCellValue(`F${row}`);
-        const UOM = xlsxHelper.getCellValue(`G${row}`);
-        const quantity = xlsxHelper.getCellValue(`H${row}`);
-        const unitPriceInfo = xlsxHelper.getCellValue(`I${row}`);
-        const unitPrice = unitPriceInfo?.result || unitPriceInfo;
-        const total = xlsxHelper.getCellValue(`J${row}`);
-        items.push({ description, category, grossWeight, netWeight, HSCode, UOM, quantity, unitPrice, total });
-        row++;
+        const itemsHeaderLabelRate = xlsxHelper.getCellValue('I24');
+        const itemsHeaderLabelAmount = xlsxHelper.getCellValue('J24');
+        // Items (dynamic): Start from row 29, read columns A-D for each row (description, quantity, unitPrice, total) until description is empty
+        const items = [];
+        let row = 29;
+        while (true) {
+            const description = xlsxHelper.getCellValue(`A${row}`);
+            if (description === undefined || description === null || description === "") break;
+            const category = xlsxHelper.getCellValue(`C${row}`);
+            const grossWeight = xlsxHelper.getCellValue(`D${row}`);
+            const netWeight = xlsxHelper.getCellValue(`E${row}`);
+            const HSCode = xlsxHelper.getCellValue(`F${row}`);
+            const UOM = xlsxHelper.getCellValue(`G${row}`);
+            const quantity = xlsxHelper.getCellValue(`H${row}`);
+            const unitPriceInfo = xlsxHelper.getCellValue(`I${row}`);
+            const unitPrice = unitPriceInfo?.result || unitPriceInfo;
+            const total = xlsxHelper.getCellValue(`J${row}`);
+            items.push({ description, category, grossWeight, netWeight, HSCode, UOM, quantity, unitPrice, total });
+            row++;
+        }
+
+        const totalGrossWeightInfo = xlsxHelper.getCellValue(`D${row + 1}`);
+        const totalGrossWeight = totalGrossWeightInfo?.result || totalGrossWeightInfo;
+        const totalNetWeightInfo = xlsxHelper.getCellValue(`E${row + 1}`);
+        const totalNetWeight = totalNetWeightInfo?.result || totalNetWeightInfo;
+
+        const totalFOBAmountLabel = xlsxHelper.getCellValue(`I${row + 8}`);
+        const totalFOBAmountInfo = xlsxHelper.getCellValue(`J${row + 8}`);
+        const totalFOBAmount = totalFOBAmountInfo?.result || totalFOBAmountInfo;
+        const totalFreightAmountLabel = xlsxHelper.getCellValue(`I${row + 9}`);
+        const totalFreightAmountInfo = xlsxHelper.getCellValue(`J${row + 9}`);
+        const totalFreightAmount = totalFreightAmountInfo?.result || totalFreightAmountInfo;
+        const totalInsuranceAmountLabel = xlsxHelper.getCellValue(`I${row + 10}`);
+        const totalInsuranceAmountInfo = xlsxHelper.getCellValue(`J${row + 10}`);
+        const totalInsuranceAmount = totalInsuranceAmountInfo?.result || totalInsuranceAmountInfo;
+        const totalCIFAmountLabel = xlsxHelper.getCellValue(`I${row + 11}`);
+        const totalCIFAmountInfo = xlsxHelper.getCellValue(`J${row + 11}`);
+        const totalCIFAmount = totalCIFAmountInfo?.result || totalCIFAmountInfo;
+
+        const conversionRate = xlsxHelper.getCellValue(`B${row + 10}`);
+        const totalValueLabel = xlsxHelper.getCellValue(`A${row + 11}`);
+        const totalValueInfo = xlsxHelper.getCellValue(`B${row + 11}`);
+        const totalValue = totalValueInfo?.result || totalValueInfo;
+        const totalValueWords = xlsxHelper.getCellValue(`B${row + 13}`);
+
+        const beneficiaryBankName = xlsxHelper.getCellValue(`C${row + 16}`);
+        const beneficiaryBankAddress = xlsxHelper.getCellValue(`C${row + 17}`);
+        const beneficiaryBankAccountNumber = xlsxHelper.getCellValue(`C${row + 18}`);
+        const beneficiaryBankSwiftCode = xlsxHelper.getCellValue(`C${row + 19}`);
+        const beneficiaryBankClearingCode = xlsxHelper.getCellValue(`C${row + 20}`);
+
+        const correspondentBankName = xlsxHelper.getCellValue(`H${row + 16}`);
+        const correspondentBankAddress = xlsxHelper.getCellValue(`H${row + 17}`);
+        const correspondentBankAccountNumber = xlsxHelper.getCellValue(`H${row + 18}`);
+        const correspondentBankSwiftCode = xlsxHelper.getCellValue(`H${row + 19}`);
+        const correspondentBankClearingCode = xlsxHelper.getCellValue(`H${row + 20}`);
+        const manufacturingDeclaration = xlsxHelper.getCellValue(`A${row + 21}`);
+
+        const marksAndNos = xlsxHelper.getCellValue(`A${row + 23}`);
+        const invoiceJSANumber = xlsxHelper.getCellValue(`B${row + 26}`);
+        const signatureForImporter = xlsxHelper.getCellValue(`H${row + 25}`);
+        const signatureDate = xlsxHelper.getCellValue(`H${row + 29}`);
+        const signaturePersonName = xlsxHelper.getCellValue(`J${row + 28}`);
+        const signaturePersonDesignation = xlsxHelper.getCellValue(`J${row + 29}`);
+
+        let invoiceData = {
+            invoiceNumber,
+            date,
+            exportReference,
+            merchantExporter,
+            consignee,
+            buyer,
+            preCarriageBy,
+            placeOfReceipt,
+            vesselNumber,
+            portOfLoading,
+            portOfDischarge,
+            finalDestination,
+            countryOfOriginOfGoods,
+            countryOfFinalDestination,
+            terms,
+            bankerName,
+            bankerAddress,
+            bankerAccountDetails,
+            packagingDetails,
+            invoiceHSNCode,
+            itemsDescription,
+            itemsHeaderLabelRate,
+            itemsHeaderLabelAmount,
+            items,
+            totalGrossWeight,
+            totalNetWeight,
+            totalFOBAmountLabel,
+            totalFreightAmountLabel,
+            totalInsuranceAmountLabel,
+            totalCIFAmountLabel,
+            totalFOBAmount,
+            totalFreightAmount,
+            totalInsuranceAmount,
+            totalCIFAmount,
+            conversionRate,
+            totalValueLabel,
+            totalValue,
+            totalValueWords,
+            beneficiaryBankName,
+            beneficiaryBankAddress,
+            beneficiaryBankAccountNumber,
+            beneficiaryBankSwiftCode,
+            beneficiaryBankClearingCode,
+            correspondentBankName,
+            correspondentBankAddress,
+            correspondentBankAccountNumber,
+            correspondentBankSwiftCode,
+            correspondentBankClearingCode,
+            manufacturingDeclaration,
+            marksAndNos,
+            invoiceJSANumber,
+            signatureForImporter,
+            signatureDate,
+            signaturePersonName,
+            signaturePersonDesignation,
+        };
+        return invoiceData;
+    } catch (error) {
+        console.error('Error extracting invoice data:', error);
+        throw error;
     }
 
-    const totalGrossWeightInfo = xlsxHelper.getCellValue(`D${row + 1}`);
-    const totalGrossWeight = totalGrossWeightInfo?.result || totalGrossWeightInfo;
-    const totalNetWeightInfo = xlsxHelper.getCellValue(`E${row + 1}`);
-    const totalNetWeight = totalNetWeightInfo?.result || totalNetWeightInfo;
-
-    const totalFOBAmountLabel = xlsxHelper.getCellValue(`I${row + 8}`);
-    const totalFOBAmountInfo = xlsxHelper.getCellValue(`J${row + 8}`);
-    const totalFOBAmount = totalFOBAmountInfo?.result || totalFOBAmountInfo;
-    const totalFreightAmountLabel = xlsxHelper.getCellValue(`I${row + 9}`);
-    const totalFreightAmountInfo = xlsxHelper.getCellValue(`J${row + 9}`);
-    const totalFreightAmount = totalFreightAmountInfo?.result || totalFreightAmountInfo;
-    const totalInsuranceAmountLabel = xlsxHelper.getCellValue(`I${row + 10}`);
-    const totalInsuranceAmountInfo = xlsxHelper.getCellValue(`J${row + 10}`);
-    const totalInsuranceAmount = totalInsuranceAmountInfo?.result || totalInsuranceAmountInfo;
-    const totalCIFAmountLabel = xlsxHelper.getCellValue(`I${row + 11}`);
-    const totalCIFAmountInfo = xlsxHelper.getCellValue(`J${row + 11}`);
-    const totalCIFAmount = totalCIFAmountInfo?.result || totalCIFAmountInfo;
-
-    const conversionRate = xlsxHelper.getCellValue(`B${row + 10}`);
-    const totalValueLabel = xlsxHelper.getCellValue(`A${row + 11}`);
-    const totalValueInfo = xlsxHelper.getCellValue(`B${row + 11}`);
-    const totalValue = totalValueInfo?.result || totalValueInfo;
-    const totalValueWords = xlsxHelper.getCellValue(`B${row + 13}`);
-
-    const beneficiaryBankName = xlsxHelper.getCellValue(`C${row + 16}`);
-    const beneficiaryBankAddress = xlsxHelper.getCellValue(`C${row + 17}`);
-    const beneficiaryBankAccountNumber = xlsxHelper.getCellValue(`C${row + 18}`);
-    const beneficiaryBankSwiftCode = xlsxHelper.getCellValue(`C${row + 19}`);
-    const beneficiaryBankClearingCode = xlsxHelper.getCellValue(`C${row + 20}`);
-
-    const correspondentBankName = xlsxHelper.getCellValue(`H${row + 16}`);
-    const correspondentBankAddress = xlsxHelper.getCellValue(`H${row + 17}`);
-    const correspondentBankAccountNumber = xlsxHelper.getCellValue(`H${row + 18}`);
-    const correspondentBankSwiftCode = xlsxHelper.getCellValue(`H${row + 19}`);
-    const correspondentBankClearingCode = xlsxHelper.getCellValue(`H${row + 20}`);
-    const manufacturingDeclaration = xlsxHelper.getCellValue(`A${row + 21}`);
-
-    const marksAndNos = xlsxHelper.getCellValue(`A${row + 23}`);
-    const invoiceJSANumber = xlsxHelper.getCellValue(`B${row + 26}`);
-    const signatureForImporter = xlsxHelper.getCellValue(`H${row + 25}`);
-    const signatureDate = xlsxHelper.getCellValue(`H${row + 29}`);
-    const signaturePersonName = xlsxHelper.getCellValue(`J${row + 28}`);
-    const signaturePersonDesignation = xlsxHelper.getCellValue(`J${row + 29}`);
-
-    let invoiceData = {
-        invoiceNumber,
-        date,
-        exportReference,
-        merchantExporter,
-        consignee,
-        buyer,
-        preCarriageBy,
-        placeOfReceipt,
-        vesselNumber,
-        portOfLoading,
-        portOfDischarge,
-        finalDestination,
-        countryOfOriginOfGoods,
-        countryOfFinalDestination,
-        terms,
-        bankerName,
-        bankerAddress,
-        bankerAccountDetails,
-        packagingDetails,
-        invoiceHSNCode,
-        itemsDescription,
-        itemsHeaderLabelRate,
-        itemsHeaderLabelAmount,
-        items,
-        totalGrossWeight,
-        totalNetWeight,
-        totalFOBAmountLabel,
-        totalFreightAmountLabel,
-        totalInsuranceAmountLabel,
-        totalCIFAmountLabel,
-        totalFOBAmount,
-        totalFreightAmount,
-        totalInsuranceAmount,
-        totalCIFAmount,
-        conversionRate,
-        totalValueLabel,
-        totalValue,
-        totalValueWords,
-        beneficiaryBankName,
-        beneficiaryBankAddress,
-        beneficiaryBankAccountNumber,
-        beneficiaryBankSwiftCode,
-        beneficiaryBankClearingCode,
-        correspondentBankName,
-        correspondentBankAddress,
-        correspondentBankAccountNumber,
-        correspondentBankSwiftCode,
-        correspondentBankClearingCode,
-        manufacturingDeclaration,
-        marksAndNos,
-        invoiceJSANumber,
-        signatureForImporter,
-        signatureDate,
-        signaturePersonName,
-        signaturePersonDesignation,
-    };
-    return invoiceData;
 }
 
 const generateTranslatedInvoiceFile = async (filePath, invoiceData) => {
