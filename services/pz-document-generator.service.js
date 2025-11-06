@@ -266,10 +266,130 @@ class PZDocumentGeneratorService {
     }
 
     /**
+     * Draw a table cell with border, padding, and multiline text support
+     * @param {Object} doc - PDFKit document
+     * @param {number} x - X position
+     * @param {number} y - Y position
+     * @param {number} width - Cell width
+     * @param {number} height - Cell height
+     * @param {string} text - Cell text (supports multiline)
+     * @param {Object} options - Cell options (align, fontSize, font, padding, borderColor, drawBorders)
+     * @returns {number} - Actual height used by the cell
+     */
+    drawTableCell(doc, x, y, width, height, text, options = {}) {
+        const {
+            align = 'left',
+            fontSize = 7,
+            font = 'Helvetica',
+            padding = 4,
+            borderColor = '#000000',
+            borderWidth = 1,
+            drawBorders = { top: true, right: true, bottom: true, left: true }
+        } = options;
+
+        // Set font
+        doc.font(font).fontSize(fontSize);
+
+        // Calculate text area (width minus padding)
+        const textWidth = width - (padding * 2);
+        const textX = x + padding;
+        const textY = y + padding;
+
+        // Draw cell borders (1px) - draw each border separately for better control
+        doc.lineWidth(borderWidth).strokeColor(borderColor);
+
+        if (drawBorders.top) {
+            doc.moveTo(x, y).lineTo(x + width, y).stroke();
+        }
+        if (drawBorders.right) {
+            doc.moveTo(x + width, y).lineTo(x + width, y + height).stroke();
+        }
+        if (drawBorders.bottom) {
+            doc.moveTo(x, y + height).lineTo(x + width, y + height).stroke();
+        }
+        if (drawBorders.left) {
+            doc.moveTo(x, y).lineTo(x, y + height).stroke();
+        }
+
+        // Draw text with multiline support
+        const textHeight = doc.heightOfString(text || '', {
+            width: textWidth,
+            align: align
+        });
+
+        // Draw text content
+        doc.text(text || '', textX, textY, {
+            width: textWidth,
+            align: align,
+            lineGap: 1
+        });
+
+        // Return actual height used
+        return Math.max(height, textHeight + (padding * 2));
+    }
+
+    /**
+     * Draw a complete table row
+     * @param {Object} doc - PDFKit document
+     * @param {number} startX - Starting X position
+     * @param {number} startY - Starting Y position
+     * @param {Array} columns - Array of column definitions {width, text, align}
+     * @param {Object} rowOptions - Row options (fontSize, font, padding, isHeader)
+     * @returns {number} - Height of the row
+     */
+    drawTableRow(doc, startX, startY, columns, rowOptions = {}) {
+        const {
+            fontSize = 7,
+            font = 'Helvetica',
+            padding = 4,
+            isHeader = false
+        } = rowOptions;
+
+        // Calculate row height based on content
+        let maxHeight = 0;
+        const cellOptions = {
+            fontSize: isHeader ? 8 : fontSize,
+            font: isHeader ? 'Helvetica-Bold' : font,
+            padding: padding
+        };
+
+        // First pass: calculate max height needed for all cells
+        columns.forEach((col, index) => {
+            const cellAlign = col.align || (index === 0 ? 'center' : index >= columns.length - 3 ? 'right' : 'left');
+            doc.font(cellOptions.font).fontSize(cellOptions.fontSize);
+            const textHeight = doc.heightOfString(col.text || '', {
+                width: col.width - (cellOptions.padding * 2)
+            });
+            const cellHeight = textHeight + (cellOptions.padding * 2);
+            maxHeight = Math.max(maxHeight, cellHeight);
+        });
+
+        // Ensure minimum row height for professional appearance
+        maxHeight = Math.max(maxHeight, isHeader ? 22 : 20);
+
+        // Second pass: draw all cells with all borders (overlap creates clean 1px lines)
+        let currentX = startX;
+        columns.forEach((col, index) => {
+            const cellAlign = col.align || (index === 0 ? 'center' : index >= columns.length - 3 ? 'right' : 'left');
+
+            const cellOptionsWithAlign = {
+                ...cellOptions,
+                align: cellAlign
+            };
+
+            this.drawTableCell(doc, currentX, startY, col.width, maxHeight, col.text || '', cellOptionsWithAlign);
+            currentX += col.width;
+        });
+
+        return maxHeight;
+    }
+
+    /**
      * Add items table with all items from all invoices
      */
     addItemsTable(doc, data) {
         const { allItems } = data;
+        const taxRate = 23;
         console.log("allItems", allItems);
 
         if (!allItems || allItems.length === 0) {
@@ -278,22 +398,11 @@ class PZDocumentGeneratorService {
             return;
         }
 
-        // Table header
-        doc.fontSize(8).font('Helvetica-Bold');
-        const tableTop = doc.y;
         const leftMargin = 50;
-
-
-        // itemName: item.description + " " + item.category,
-        //         uom: item.UOM,
-        //         unitQuantity: item.quantity,
-        //         netPrice: item.unitPrice.toFixed(2),
-        //         taxRate: taxRate + "%",
-        //         netTotal: item.total.toFixed(2),
-        //     grossTotal: 
+        const tableStartY = doc.y;
 
         // Column widths
-        const col = {
+        const colWidths = {
             no: 30,
             itemName: 180,
             uom: 50,
@@ -304,80 +413,70 @@ class PZDocumentGeneratorService {
             grossTotal: 70
         };
 
-        // Header row
-        doc.text('Lp.', leftMargin, tableTop, { width: col.no, continued: false });
-        doc.text('Nazwa', leftMargin + col.no, tableTop, { width: col.itemName, continued: false });
-        doc.text('Jedn', leftMargin + col.no + col.itemName, tableTop, { width: col.uom, continued: false });
-        doc.text('Ilość', leftMargin + col.no + col.itemName + col.unitQuantity, tableTop, { width: col.unitQuantity, continued: false });
-        doc.text('Cena netto', leftMargin + col.no + col.itemName + col.unitQuantity + col.netPrice, tableTop, { width: col.netPrice, continued: false });
-        doc.text('Stawka', leftMargin + col.no + col.itemName + col.unitQuantity + col.netPrice + col.taxRate, tableTop, { width: col.taxRate, continued: false });
-        doc.text('Wartość netto', leftMargin + col.no + col.itemName + col.unitQuantity + col.netPrice + col.taxRate + col.netTotal, tableTop, { width: col.netTotal, continued: false });
-        doc.text('Wartość brutto', leftMargin + col.no + col.itemName + col.unitQuantity + col.netPrice + col.taxRate + col.netTotal + col.grossTotal, tableTop, { width: col.grossTotal, continued: false });
+        // Helper function to draw table header
+        const drawTableHeader = (yPos) => {
+            const headerColumns = [
+                { width: colWidths.no, text: 'Lp.', align: 'center' },
+                { width: colWidths.itemName, text: 'Nazwa', align: 'left' },
+                { width: colWidths.uom, text: 'Jedn', align: 'center' },
+                { width: colWidths.unitQuantity, text: 'Ilość', align: 'right' },
+                { width: colWidths.netPrice, text: 'Cena netto', align: 'right' },
+                { width: colWidths.taxRate, text: 'Stawka', align: 'center' },
+                { width: colWidths.netTotal, text: 'Wartość netto', align: 'right' },
+                { width: colWidths.grossTotal, text: 'Wartość brutto', align: 'right' }
+            ];
 
-        // Draw line under header
-        doc.moveDown(0.3);
-        const lineY = doc.y;
-        doc.moveTo(leftMargin, lineY)
-            .lineTo(550, lineY)
-            .stroke();
+            return this.drawTableRow(doc, leftMargin, yPos, headerColumns, {
+                fontSize: 8,
+                font: 'Helvetica-Bold',
+                padding: 5,
+                isHeader: true
+            });
+        };
 
-        doc.moveDown(0.3);
-        doc.font('Helvetica').fontSize(7);
+        // Draw initial table header
+        let currentY = tableStartY;
+        let headerHeight = drawTableHeader(currentY);
+        currentY += headerHeight;
 
-        // Table rows
+        // Draw table rows
         allItems.forEach((item, index) => {
-            // Check if we need a new page
-            if (doc.y > 700) {
+            // Check if we need a new page (leave space for at least one row)
+            if (currentY > 700) {
                 doc.addPage();
                 // Re-draw header on new page
                 this.drawPageHeader(doc, data.recipient, data.supplier, data.pzNumber, data.issueDate, data.warehouse);
-
                 // Re-draw table header
-                // doc.fontSize(10).font('Helvetica-Bold');
-                // const newTableTop = doc.y;
-                // doc.text('Lp.', leftMargin, newTableTop, { width: col.no, continued: false });
-                // doc.text('Nazwa towaru / Item Name', leftMargin + col.no, newTableTop, { width: col.itemName, continued: false });
-                // doc.text('Ilość / Qty', leftMargin + col.no + col.itemName, newTableTop, { width: col.quantity, continued: false });
-                // doc.text('Cena netto / Net Price', leftMargin + col.no + col.itemName + col.quantity, newTableTop, { width: col.netPrice, continued: false });
-                // doc.text('Stawka / Rate', leftMargin + col.no + col.itemName + col.quantity + col.netPrice, newTableTop, { width: col.rate, continued: false });
-                // doc.text('Wart. netto / Net Value', leftMargin + col.no + col.itemName + col.quantity + col.netPrice + col.rate, newTableTop, { width: col.netValue, continued: false });
-                // doc.text('Wart. brutto / Gross Value', leftMargin + col.no + col.itemName + col.quantity + col.netPrice + col.rate + col.netValue, newTableTop, { width: col.grossValue, continued: false });
-
-                doc.fontSize(10).font('Helvetica-Bold');
-                const newTableTop = doc.y;
-                doc.text('Lp.', leftMargin, newTableTop, { width: col.no, continued: false });
-                doc.text('Nazwa', leftMargin + col.no, newTableTop, { width: col.itemName, continued: false });
-                doc.text('Jedn', leftMargin + col.no + col.itemName, newTableTop, { width: col.uom, continued: false });
-                doc.text('Ilość', leftMargin + col.no + col.itemName + col.unitQuantity, newTableTop, { width: col.unitQuantity, continued: false });
-                doc.text('Cena netto', leftMargin + col.no + col.itemName + col.unitQuantity + col.netPrice, newTableTop, { width: col.netPrice, continued: false });
-                doc.text('Stawka', leftMargin + col.no + col.itemName + col.unitQuantity + col.netPrice + col.taxRate, newTableTop, { width: col.taxRate, continued: false });
-                doc.text('Wartość netto', leftMargin + col.no + col.itemName + col.unitQuantity + col.netPrice + col.taxRate + col.netTotal, newTableTop, { width: col.netTotal, continued: false });
-                doc.text('Wartość brutto', leftMargin + col.no + col.itemName + col.unitQuantity + col.netPrice + col.taxRate + col.netTotal + col.grossTotal, newTableTop, { width: col.grossTotal, continued: false });
-
-                doc.moveDown(0.6);
-                const newLineY = doc.y;
-                doc.moveTo(leftMargin, newLineY)
-                    .lineTo(550, newLineY)
-                    .stroke();
-                doc.moveDown(0.6);
-                doc.font('Helvetica').fontSize(7);
+                currentY = doc.y;
+                headerHeight = drawTableHeader(currentY);
+                currentY += headerHeight;
             }
 
-            const rowY = doc.y;
+            // Prepare row data
+            const rowColumns = [
+                { width: colWidths.no, text: (index + 1).toString(), align: 'center' },
+                { width: colWidths.itemName, text: item.itemName || item.description || 'N/A', align: 'left' },
+                { width: colWidths.uom, text: item.uom || item.UOM || '-', align: 'center' },
+                { width: colWidths.unitQuantity, text: String(item.unitQuantity || item.quantity || '-'), align: 'right' },
+                { width: colWidths.netPrice, text: item.netPrice || (item.unitPrice ? item.unitPrice.toFixed(2) : '-'), align: 'right' },
+                { width: colWidths.taxRate, text: item.taxRate || `${taxRate}%`, align: 'center' },
+                { width: colWidths.netTotal, text: item.netTotal || (item.total ? item.total.toFixed(2) : '-'), align: 'right' },
+                { width: colWidths.grossTotal, text: item.grossTotal || (item.total ? (item.total * (1 + taxRate / 100)).toFixed(2) : '-'), align: 'right' }
+            ];
 
-            doc.text((index + 1).toString(), leftMargin, rowY, { width: col.no, continued: false });
-            doc.text(item.itemName || item.description || 'N/A', leftMargin + col.no, rowY, { width: col.itemName, continued: false });
-            doc.text(item.uom || item.UOM || '-', leftMargin + col.no + col.itemName, rowY, { width: col.uom, continued: false });
-            doc.text(item.unitQuantity || item.quantity || '-', leftMargin + col.no + col.itemName + col.uom, rowY, { width: col.unitQuantity, continued: false });
-            doc.text(item.netPrice || item.unitPrice || '-', leftMargin + col.no + col.itemName + col.unitQuantity, rowY, { width: col.netPrice, continued: false });
-            doc.text(item.taxRate || taxRate + '%' || '-', leftMargin + col.no + col.itemName + col.unitQuantity + col.netPrice + col.taxRate, rowY, { width: col.taxRate, continued: false });
-            doc.text(item.netTotal || item.total || '-', leftMargin + col.no + col.itemName + col.unitQuantity + col.netPrice + col.taxRate, rowY, { width: col.netTotal, continued: false });
-            doc.text(item.grossTotal || item.total * (1 + taxRate / 100) || '-', leftMargin + col.no + col.itemName + col.unitQuantity + col.netPrice + col.taxRate + col.netTotal, rowY, { width: col.grossTotal, continued: false });
+            // Draw row
+            const rowHeight = this.drawTableRow(doc, leftMargin, currentY, rowColumns, {
+                fontSize: 7,
+                font: 'Helvetica',
+                padding: 4,
+                isHeader: false
+            });
 
-            doc.moveDown(0.6);
+            currentY += rowHeight;
         });
 
-        doc.moveDown(1);
+        // Update document Y position
+        doc.y = currentY + 10;
     }
 
     /**
