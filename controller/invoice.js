@@ -15,10 +15,13 @@ const controller = {
   create: async function (req, res) {
     try {
       const data = req.body;
+      console.log("data", data);
       // Verify project exists
       const project = await Project.findOne({
         where: { guid: data.projectId },
       });
+
+      console.log("project", project);
       if (!project) {
         return sendResponseWithData(
           res,
@@ -29,6 +32,7 @@ const controller = {
       }
       // Verify group exists
       const group = await Group.findOne({ where: { guid: data.groupId } });
+      console.log("group", group);
       if (!group) {
         return sendResponseWithData(
           res,
@@ -39,6 +43,7 @@ const controller = {
       }
 
       let originalFilePath = null;
+      console.log("req?.files", req?.files);
 
 
 
