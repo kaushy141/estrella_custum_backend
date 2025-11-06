@@ -9,6 +9,7 @@ const commonHelper = require("../helper/common-helper");
 const _ = require("lodash");
 const openAIHelper = require("../helper/openai-helper");
 const { extractInvoiceData } = require("../helper/invoice-helper");
+const logger = require("../utils/logger");
 const controller = {
   // Create new invoice
   create: async function (req, res) {
@@ -49,7 +50,7 @@ const controller = {
       }
       data.originalFilePath = originalFilePath;
 
-      console.log("Starting data extraction from the original file", originalFilePath);
+      logger.log("Starting data extraction from the original file", originalFilePath);
       const originalFileContent = await extractInvoiceData(originalFilePath);
       //console.log("originalFileContent", originalFileContent);
       data.originalFileContent = JSON.stringify(originalFileContent);
