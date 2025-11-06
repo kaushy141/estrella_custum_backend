@@ -69,24 +69,15 @@ class PZDocumentGeneratorService {
                 console.warn('Failed to parse custom declaration original file content:', e);
             }
 
-            // "description": " SZT., SL925 SREBRO CZ Stud Srebrny Żyd.",
-            //       "category": " PIERŚCIEŃ",
-            //       "grossWeight": 2.56,
-            //       "netWeight": 2.46,
-            //       "HSCode": 71131149,
-            //       "UOM": " PCS",
-            //       "quantity": 2,
-            //       "unitPrice": 22.5,
-            //       "total": 45
-            console.log(invoices);
-
-            const allItems = invoices.map(invoice => JSON.parse(invoice.originalFileContent).items).flat().map(item => ({
-                itemName: item.description,
+            const taxRate = 23;
+            const allItems = invoices.map(invoice => JSON.parse(invoice.translatedFileContent).items).flat().map(item => ({
+                itemName: item.description + " " + item.category,
+                uom: item.UOM,
                 unitQuantity: item.quantity,
-                netPrice: item.unitPrice,
-                rate: item.rate,
-                netValue: item.total,
-                grossValue: item.total
+                netPrice: item.unitPrice.toFixed(2),
+                taxRate: taxRate + "%",
+                netTotal: item.total.toFixed(2),
+                grossTotal: (item.total * (1 + taxRate / 100)).toFixed(2)
             })).flat();
             const recipientInfo = JSON.parse(invoices[0].originalFileContent).consignee;
             const supplierInfo = JSON.parse(invoices[0].originalFileContent).merchantExporter;
@@ -292,25 +283,36 @@ class PZDocumentGeneratorService {
         const tableTop = doc.y;
         const leftMargin = 50;
 
+
+        // itemName: item.description + " " + item.category,
+        //         uom: item.UOM,
+        //         unitQuantity: item.quantity,
+        //         netPrice: item.unitPrice.toFixed(2),
+        //         taxRate: taxRate + "%",
+        //         netTotal: item.total.toFixed(2),
+        //     grossTotal: 
+
         // Column widths
         const col = {
             no: 30,
             itemName: 180,
-            quantity: 50,
+            uom: 50,
+            unitQuantity: 50,
             netPrice: 60,
-            rate: 40,
-            netValue: 70,
-            grossValue: 70
+            taxRate: 40,
+            netTotal: 70,
+            grossTotal: 70
         };
 
         // Header row
         doc.text('Lp.', leftMargin, tableTop, { width: col.no, continued: false });
-        doc.text('Nazwa towaru / Item Name', leftMargin + col.no, tableTop, { width: col.itemName, continued: false });
-        doc.text('Ilość / Qty', leftMargin + col.no + col.itemName, tableTop, { width: col.quantity, continued: false });
-        doc.text('Cena netto / Net Price', leftMargin + col.no + col.itemName + col.quantity, tableTop, { width: col.netPrice, continued: false });
-        doc.text('Stawka / Rate', leftMargin + col.no + col.itemName + col.quantity + col.netPrice, tableTop, { width: col.rate, continued: false });
-        doc.text('Wart. netto / Net Value', leftMargin + col.no + col.itemName + col.quantity + col.netPrice + col.rate, tableTop, { width: col.netValue, continued: false });
-        doc.text('Wart. brutto / Gross Value', leftMargin + col.no + col.itemName + col.quantity + col.netPrice + col.rate + col.netValue, tableTop, { width: col.grossValue, continued: false });
+        doc.text('Nazwa', leftMargin + col.no, tableTop, { width: col.itemName, continued: false });
+        doc.text('Jedn', leftMargin + col.no + col.itemName, tableTop, { width: col.uom, continued: false });
+        doc.text('Ilość', leftMargin + col.no + col.itemName + col.unitQuantity, tableTop, { width: col.unitQuantity, continued: false });
+        doc.text('Cena netto', leftMargin + col.no + col.itemName + col.unitQuantity + col.netPrice, tableTop, { width: col.netPrice, continued: false });
+        doc.text('Stawka', leftMargin + col.no + col.itemName + col.unitQuantity + col.netPrice + col.taxRate, tableTop, { width: col.taxRate, continued: false });
+        doc.text('Wartość netto', leftMargin + col.no + col.itemName + col.unitQuantity + col.netPrice + col.taxRate + col.netTotal, tableTop, { width: col.netTotal, continued: false });
+        doc.text('Wartość brutto', leftMargin + col.no + col.itemName + col.unitQuantity + col.netPrice + col.taxRate + col.netTotal + col.grossTotal, tableTop, { width: col.grossTotal, continued: false });
 
         // Draw line under header
         doc.moveDown(0.3);
