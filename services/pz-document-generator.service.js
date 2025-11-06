@@ -287,11 +287,12 @@ class PZDocumentGeneratorService {
             drawBorders = { top: true, right: true, bottom: true, left: true }
         } = options;
 
-        // Set font
+        // Set font before calculating text dimensions
         doc.font(font).fontSize(fontSize);
 
-        // Calculate text area (width minus padding)
-        const textWidth = width - (padding * 2);
+        // Calculate text area (width minus padding on both sides)
+        // Ensure textWidth is at least 1 to avoid errors
+        const textWidth = Math.max(1, width - (padding * 2));
         const textX = x + padding;
         const textY = y + padding;
 
@@ -311,21 +312,30 @@ class PZDocumentGeneratorService {
             doc.moveTo(x, y).lineTo(x, y + height).stroke();
         }
 
-        // Draw text with multiline support
-        const textHeight = doc.heightOfString(text || '', {
-            width: textWidth,
-            align: align
-        });
+        // Convert text to string and ensure it's not empty
+        const textString = String(text || '').trim();
 
-        // Draw text content
-        doc.text(text || '', textX, textY, {
-            width: textWidth,
-            align: align,
-            lineGap: 1
-        });
+        if (textString) {
+            // Calculate text height with proper wrapping - this ensures text fits within cell width
+            const textHeight = doc.heightOfString(textString, {
+                width: textWidth,
+                align: align
+            });
 
-        // Return actual height used
-        return Math.max(height, textHeight + (padding * 2));
+            // Draw text content with strict width constraint to enforce wrapping
+            // PDFKit will automatically wrap text when width is specified
+            doc.text(textString, textX, textY, {
+                width: textWidth,  // This enforces text wrapping within cell boundaries
+                align: align,
+                lineGap: 1
+            });
+
+            // Return actual height used (considering text wrapping)
+            return Math.max(height, textHeight + (padding * 2));
+        } else {
+            // Empty cell, return minimum height
+            return Math.max(height, fontSize + (padding * 2));
+        }
     }
 
     /**
@@ -357,8 +367,13 @@ class PZDocumentGeneratorService {
         columns.forEach((col, index) => {
             const cellAlign = col.align || (index === 0 ? 'center' : index >= columns.length - 3 ? 'right' : 'left');
             doc.font(cellOptions.font).fontSize(cellOptions.fontSize);
-            const textHeight = doc.heightOfString(col.text || '', {
-                width: col.width - (cellOptions.padding * 2)
+
+            // Convert text to string for consistent calculation
+            const textString = String(col.text || '').trim();
+            const textWidth = Math.max(1, col.width - (cellOptions.padding * 2));
+
+            const textHeight = doc.heightOfString(textString, {
+                width: textWidth
             });
             const cellHeight = textHeight + (cellOptions.padding * 2);
             maxHeight = Math.max(maxHeight, cellHeight);
@@ -399,19 +414,35 @@ class PZDocumentGeneratorService {
         }
 
         const leftMargin = 50;
+        const rightMargin = 50;
         const tableStartY = doc.y;
 
-        // Column widths
+        // A4 page width is 595 points, with margins: 595 - 50 - 50 = 495 points available
+        const availableWidth = 595 - leftMargin - rightMargin;
+
+        // Column widths - adjusted to fit within available width (495 points)
+        // Total: 25 + 140 + 45 + 45 + 55 + 35 + 65 + 65 = 475 points (leaves 20 points buffer)
         const colWidths = {
-            no: 30,
-            itemName: 180,
-            uom: 50,
-            unitQuantity: 50,
-            netPrice: 60,
-            taxRate: 40,
-            netTotal: 70,
-            grossTotal: 70
+            no: 25,
+            itemName: 140,
+            uom: 45,
+            unitQuantity: 45,
+            netPrice: 55,
+            taxRate: 35,
+            netTotal: 65,
+            grossTotal: 65
         };
+
+        // Verify total width doesn't exceed available width
+        const totalWidth = Object.values(colWidths).reduce((sum, width) => sum + width, 0);
+        if (totalWidth > availableWidth) {
+            console.warn(`Table width (${totalWidth}) exceeds available width (${availableWidth}). Adjusting columns...`);
+            // Scale down proportionally if needed
+            const scaleFactor = availableWidth / totalWidth;
+            Object.keys(colWidths).forEach(key => {
+                colWidths[key] = Math.floor(colWidths[key] * scaleFactor);
+            });
+        }
 
         // Helper function to draw table header
         const drawTableHeader = (yPos) => {
