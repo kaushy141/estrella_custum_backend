@@ -333,22 +333,33 @@ class PZDocumentGeneratorService {
                 this.drawPageHeader(doc, data.recipient, data.supplier, data.pzNumber, data.issueDate, data.warehouse);
 
                 // Re-draw table header
+                // doc.fontSize(10).font('Helvetica-Bold');
+                // const newTableTop = doc.y;
+                // doc.text('Lp.', leftMargin, newTableTop, { width: col.no, continued: false });
+                // doc.text('Nazwa towaru / Item Name', leftMargin + col.no, newTableTop, { width: col.itemName, continued: false });
+                // doc.text('Ilość / Qty', leftMargin + col.no + col.itemName, newTableTop, { width: col.quantity, continued: false });
+                // doc.text('Cena netto / Net Price', leftMargin + col.no + col.itemName + col.quantity, newTableTop, { width: col.netPrice, continued: false });
+                // doc.text('Stawka / Rate', leftMargin + col.no + col.itemName + col.quantity + col.netPrice, newTableTop, { width: col.rate, continued: false });
+                // doc.text('Wart. netto / Net Value', leftMargin + col.no + col.itemName + col.quantity + col.netPrice + col.rate, newTableTop, { width: col.netValue, continued: false });
+                // doc.text('Wart. brutto / Gross Value', leftMargin + col.no + col.itemName + col.quantity + col.netPrice + col.rate + col.netValue, newTableTop, { width: col.grossValue, continued: false });
+
                 doc.fontSize(10).font('Helvetica-Bold');
                 const newTableTop = doc.y;
                 doc.text('Lp.', leftMargin, newTableTop, { width: col.no, continued: false });
-                doc.text('Nazwa towaru / Item Name', leftMargin + col.no, newTableTop, { width: col.itemName, continued: false });
-                doc.text('Ilość / Qty', leftMargin + col.no + col.itemName, newTableTop, { width: col.quantity, continued: false });
-                doc.text('Cena netto / Net Price', leftMargin + col.no + col.itemName + col.quantity, newTableTop, { width: col.netPrice, continued: false });
-                doc.text('Stawka / Rate', leftMargin + col.no + col.itemName + col.quantity + col.netPrice, newTableTop, { width: col.rate, continued: false });
-                doc.text('Wart. netto / Net Value', leftMargin + col.no + col.itemName + col.quantity + col.netPrice + col.rate, newTableTop, { width: col.netValue, continued: false });
-                doc.text('Wart. brutto / Gross Value', leftMargin + col.no + col.itemName + col.quantity + col.netPrice + col.rate + col.netValue, newTableTop, { width: col.grossValue, continued: false });
+                doc.text('Nazwa', leftMargin + col.no, newTableTop, { width: col.itemName, continued: false });
+                doc.text('Jedn', leftMargin + col.no + col.itemName, newTableTop, { width: col.uom, continued: false });
+                doc.text('Ilość', leftMargin + col.no + col.itemName + col.unitQuantity, newTableTop, { width: col.unitQuantity, continued: false });
+                doc.text('Cena netto', leftMargin + col.no + col.itemName + col.unitQuantity + col.netPrice, newTableTop, { width: col.netPrice, continued: false });
+                doc.text('Stawka', leftMargin + col.no + col.itemName + col.unitQuantity + col.netPrice + col.taxRate, newTableTop, { width: col.taxRate, continued: false });
+                doc.text('Wartość netto', leftMargin + col.no + col.itemName + col.unitQuantity + col.netPrice + col.taxRate + col.netTotal, newTableTop, { width: col.netTotal, continued: false });
+                doc.text('Wartość brutto', leftMargin + col.no + col.itemName + col.unitQuantity + col.netPrice + col.taxRate + col.netTotal + col.grossTotal, newTableTop, { width: col.grossTotal, continued: false });
 
-                doc.moveDown(0.5);
+                doc.moveDown(0.6);
                 const newLineY = doc.y;
                 doc.moveTo(leftMargin, newLineY)
                     .lineTo(550, newLineY)
                     .stroke();
-                doc.moveDown(0.5);
+                doc.moveDown(0.6);
                 doc.font('Helvetica').fontSize(7);
             }
 
@@ -356,13 +367,14 @@ class PZDocumentGeneratorService {
 
             doc.text((index + 1).toString(), leftMargin, rowY, { width: col.no, continued: false });
             doc.text(item.itemName || item.description || 'N/A', leftMargin + col.no, rowY, { width: col.itemName, continued: false });
-            doc.text(item.unitQuantity || item.quantity || '-', leftMargin + col.no + col.itemName, rowY, { width: col.quantity, continued: false });
-            doc.text(item.netPrice || item.price || '-', leftMargin + col.no + col.itemName + col.quantity, rowY, { width: col.netPrice, continued: false });
-            doc.text(item.rate || item.taxRate || '-', leftMargin + col.no + col.itemName + col.quantity + col.netPrice, rowY, { width: col.rate, continued: false });
-            doc.text(item.netValue || '-', leftMargin + col.no + col.itemName + col.quantity + col.netPrice + col.rate, rowY, { width: col.netValue, continued: false });
-            doc.text(item.grossValue || item.total || '-', leftMargin + col.no + col.itemName + col.quantity + col.netPrice + col.rate + col.netValue, rowY, { width: col.grossValue, continued: false });
+            doc.text(item.uom || item.UOM || '-', leftMargin + col.no + col.itemName, rowY, { width: col.uom, continued: false });
+            doc.text(item.unitQuantity || item.quantity || '-', leftMargin + col.no + col.itemName + col.uom, rowY, { width: col.unitQuantity, continued: false });
+            doc.text(item.netPrice || item.unitPrice || '-', leftMargin + col.no + col.itemName + col.unitQuantity, rowY, { width: col.netPrice, continued: false });
+            doc.text(item.taxRate || taxRate + '%' || '-', leftMargin + col.no + col.itemName + col.unitQuantity + col.netPrice + col.taxRate, rowY, { width: col.taxRate, continued: false });
+            doc.text(item.netTotal || item.total || '-', leftMargin + col.no + col.itemName + col.unitQuantity + col.netPrice + col.taxRate, rowY, { width: col.netTotal, continued: false });
+            doc.text(item.grossTotal || item.total * (1 + taxRate / 100) || '-', leftMargin + col.no + col.itemName + col.unitQuantity + col.netPrice + col.taxRate + col.netTotal, rowY, { width: col.grossTotal, continued: false });
 
-            doc.moveDown(0.5);
+            doc.moveDown(0.6);
         });
 
         doc.moveDown(1);
