@@ -145,19 +145,19 @@ Rules:
                 const messages = await openAIService.getThreadMessages(threadId);
                 const translatedContent = messages[0].content[0].text.value;
 
-                const translatedInvoiceFile = await generateTranslatedInvoiceFile(invoiceData.originalFilePath, JSON.parse(translatedContent));
+                const translatedFilePath = await generateTranslatedInvoiceFile(invoiceData.originalFilePath, JSON.parse(translatedContent));
+                const translatedFileName = path.basename(translatedFilePath);
 
-                console.log(`Translated invoice file`, translatedInvoiceFile);
+                console.log(`Translated invoice filepath`, translatedFilePath);
 
-                await Invoice.update(
+                let invoice = await Invoice.findByPk(invoiceData.id);
+                await invoice.update(
                     {
                         status: "completed",
-                        translatedFilePath: translatedInvoiceFile.filePath,
-                        translatedFileName: translatedInvoiceFile.fileName,
-                        originalFileContent: invoiceData.originalFileContent,
+                        translatedFilePath: translatedFilePath,
+                        translatedFileName: translatedFileName,
                         translatedFileContent: translatedContent,
-                    },
-                    { where: { id: invoiceData.id } }
+                    }
                 );
 
                 return {
