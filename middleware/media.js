@@ -13,7 +13,7 @@ function uploadMiddleware(folderName, namePrefix = null) {
           cb(null, path2);
         },
 
-        
+
         // By default, multer removes file extensions so let's add them back
         filename: function (req, file, cb) {
           cb(
@@ -43,7 +43,7 @@ function uploadMiddleware(folderName, namePrefix = null) {
 }
 
 function getMediaUrl(filePath) {
-  return 'https://backend.estrellajewels.com/' + filePath;
+  return 'https://customapi.estrellajewels.com/' + filePath;
 }
 
 module.exports = { uploadMiddleware, getMediaUrl };

@@ -43,7 +43,7 @@ const controller = {
       }
 
       let originalFilePath = null;
-      console.log("req?.files", req?.files);
+      console.log("req?.files in invoice controller", req?.files);
 
 
 
@@ -55,7 +55,7 @@ const controller = {
       }
       data.originalFilePath = originalFilePath;
 
-      logger.log("Starting data extraction from the original file", originalFilePath);
+      console.log("Starting data extraction from the original file", originalFilePath);
       const originalFileContent = await extractInvoiceData(originalFilePath);
       //console.log("originalFileContent", originalFileContent);
       data.originalFileContent = JSON.stringify(originalFileContent);
