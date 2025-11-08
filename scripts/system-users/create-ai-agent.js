@@ -1,8 +1,8 @@
 const bcrypt = require('bcrypt');
-const { sequelize } = require('../db');
-const { User } = require('../models/user-model');
-const { Group } = require('../models/group-model');
-const constants = require('../config/constants');
+const { sequelize } = require('../../db');
+const { User } = require('../../models/user-model');
+const { Group } = require('../../models/group-model');
+const constants = require('../../config/constants');
 
 async function createAIAgent() {
   try {
@@ -56,18 +56,18 @@ async function createAIAgent() {
     console.log(`   Email: ${aiAgent.email}`);
     console.log(`   Group ID: ${aiAgent.groupId}`);
     console.log(`   Auth Token: ${constants.AI_AGENT.AUTH_TOKEN}`);
-    
+
     return aiAgent;
   } catch (error) {
     console.error('❌ Error creating AI Agent:', error.message);
-    
+
     if (error.name === 'SequelizeForeignKeyConstraintError') {
       console.log('\n💡 Foreign key constraint error. This usually means:');
       console.log('   - The group table structure is different than expected');
       console.log('   - There are missing required fields');
       console.log('   - Database constraints are not properly set up');
     }
-    
+
     throw error;
   }
 }

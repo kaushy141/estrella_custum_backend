@@ -1,4 +1,4 @@
-const { sequelize } = require('../db');
+const { sequelize } = require('../../db');
 
 async function resetDatabase() {
   try {
@@ -10,7 +10,7 @@ async function resetDatabase() {
     // Drop all existing tables
     const [tables] = await sequelize.query("SHOW TABLES");
     console.log('🗑️  Dropping existing tables...');
-    
+
     for (const table of tables) {
       const tableName = Object.values(table)[0];
       console.log(`   Dropping table: ${tableName}`);

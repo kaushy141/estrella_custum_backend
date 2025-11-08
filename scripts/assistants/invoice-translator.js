@@ -6,6 +6,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 const OpenAI = require('openai');
+const { Assistant } = require('../../models/assistant-model');
 require('dotenv').config();
 
 class OpenAIAssistantManager {
@@ -13,8 +14,8 @@ class OpenAIAssistantManager {
         this.openai = new OpenAI({
             apiKey: process.env.OPENAI_API_KEY,
         });
-        this.envFilePath = path.join(__dirname, '../.env');
-        this.configFilePath = path.join(__dirname, '../config/openai-assistant.json');
+        this.envFilePath = path.join(__dirname, '../../.env');
+        this.configFilePath = path.join(__dirname, '../../config/openai-assistant.json');
     }
 
     /**
@@ -184,8 +185,44 @@ Always respond with valid JSON format containing the requested data structure.`,
 
             await fs.writeFile(this.configFilePath, JSON.stringify(config, null, 2));
             console.log('💾 Assistant configuration saved to:', this.configFilePath);
+
+            await this.persistAssistantRecord(assistant, 'invoice_translation');
         } catch (error) {
             console.error('❌ Error saving assistant config:', error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * Persist assistant metadata to database
+     * @param {Object} assistant - Assistant object from OpenAI
+     * @param {string} type - Assistant type key
+     * @returns {Promise<Object>} - Persisted record
+     */
+    async persistAssistantRecord(assistant, type = 'invoice_translation') {
+        try {
+            await Assistant.update(
+                { isActive: false },
+                { where: { type, isActive: true } }
+            );
+
+            const record = await Assistant.create({
+                type,
+                assistantId: assistant.id,
+                name: assistant.name,
+                description: assistant.description,
+                model: assistant.model,
+                instructions: assistant.instructions,
+                tools: assistant.tools || [],
+                metadata: assistant.metadata || {},
+                version: assistant.metadata?.version || null,
+                isActive: true,
+            });
+
+            console.log(`💾 Assistant stored in database under type: ${type} (record id: ${record.id})`);
+            return record;
+        } catch (error) {
+            console.error('❌ Error persisting assistant to database:', error.message);
             throw error;
         }
     }

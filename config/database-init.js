@@ -12,6 +12,7 @@ const { CustomDeclaration } = require('../models/custom-declaration-model');
 const { CourierReceipt } = require('../models/courier-receipt-model');
 const { GroupAddress } = require('../models/group-address-model');
 const { ActivityLog } = require('../models/activity-log-model');
+const { Assistant } = require('../models/assistant-model');
 
 // Define the order of table creation (parent tables first)
 const syncOrder = [
@@ -20,6 +21,7 @@ const syncOrder = [
   'Project',
   'Invoice',
   'ShippingService',
+  'Assistant',
   'CustomAgent',
   'CustomClearance',
   'CustomDeclaration',
@@ -35,6 +37,7 @@ const models = {
   Project,
   Invoice,
   ShippingService,
+  Assistant,
   CustomAgent,
   CustomClearance,
   CustomDeclaration,

@@ -3,7 +3,7 @@
  * Service layer for dynamic assistant ID management
  */
 
-const OpenAIAssistantManager = require('../scripts/openai-assistant-manager');
+const OpenAIAssistantManager = require('../scripts/assistants/invoice-translator');
 const path = require('path');
 
 class OpenAIAssistantManagerService {

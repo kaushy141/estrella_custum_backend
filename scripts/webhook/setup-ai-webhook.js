@@ -1,5 +1,5 @@
 const { createAIAgent } = require('./create-ai-agent');
-const constants = require('../config/constants');
+const constants = require('../../config/constants');
 
 async function setupAIWebhook() {
   try {

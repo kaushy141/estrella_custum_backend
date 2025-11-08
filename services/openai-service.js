@@ -1,8 +1,12 @@
 const OpenAI = require('openai');
 const { toFile } = require('openai');
 const { CustomDeclaration } = require('../models/custom-declaration-model');
+const { Assistant } = require('../models/assistant-model');
 const path = require('path');
 const _ = require('lodash');
+const fsPromises = require('fs/promises');
+const pdfParse = require('pdf-parse');
+const { CourierReceipt } = require('../models/courier-receipt-model');
 require('dotenv').config();
 
 class OpenAIService {
@@ -11,9 +15,71 @@ class OpenAIService {
             apiKey: process.env.OPENAI_API_KEY,
         });
 
-        // Cache for assistant ID to avoid repeated creation
-        this.assistantId = null;
-        this.assistantCreated = false;
+        this.assistantCache = new Map();
+    }
+
+    /**
+     * Normalize assistant type aliases
+     * @param {string} type
+     * @returns {string}
+     */
+    resolveAssistantType(type = 'invoice') {
+        console.log(`Resolving assistant type: ${type}`);
+        const normalized = (type || '').toString().trim().toLowerCase();
+        const aliasMap = {
+            invoice: 'invoice_translation',
+            translation: 'invoice_translation',
+            'invoice-translation': 'invoice_translation',
+            invoice_translation: 'invoice_translation',
+            'custom-declaration': 'custom_declaration',
+            customs: 'custom_declaration',
+            custom: 'custom_declaration',
+            custom_declaration: 'custom_declaration',
+            courier: 'courier_shipment',
+            'courier-shipment': 'courier_shipment',
+            courier_receipt: 'courier_shipment',
+            courier_shipment: 'courier_shipment',
+        };
+
+        return aliasMap[normalized] || normalized || 'invoice_translation';
+    }
+
+    /**
+     * Fetch assistant record for a specific task
+     * @param {string} type
+     * @param {{ refresh?: boolean }} options
+     * @returns {Promise<Assistant>}
+     */
+    async getAssistantForTask(type = 'invoice', options = {}) {
+        const normalizedType = this.resolveAssistantType(type);
+        const refresh = options.refresh === true;
+
+        if (!refresh && this.assistantCache.has(normalizedType)) {
+            return this.assistantCache.get(normalizedType);
+        }
+
+        const assistant = await Assistant.findOne({
+            where: { type: normalizedType, isActive: true },
+            order: [['createdAt', 'DESC']],
+        });
+
+        if (!assistant) {
+            throw new Error(
+                `No active assistant found for type '${normalizedType}'. Please run the corresponding assistant provisioning script.`
+            );
+        }
+
+        this.assistantCache.set(normalizedType, assistant);
+        return assistant;
+    }
+
+    /**
+     * Clear cached assistant for a specific type
+     * @param {string} type
+     */
+    invalidateAssistantCache(type) {
+        const normalizedType = this.resolveAssistantType(type);
+        this.assistantCache.delete(normalizedType);
     }
 
     /**
@@ -21,117 +87,9 @@ class OpenAIService {
      * @returns {Promise<string>} - Assistant ID
      */
     async getAssistantId(type = 'invoice') {
-        try {
-            // Return cached assistant ID if available
-            if (this.assistantId && this.assistantCreated) {
-                return this.assistantId;
-            }
-
-            // Check environment variable first
-            let assistantId = process.env.OPENAI_ASSISTANT_ID;
-            if (type === 'invoice') {
-                assistantId = process.env.OPENAI_ASSISTANT_ID;
-            } else if (type === 'custom_declaration') {
-                assistantId = process.env.CUSTOM_VERIFICATION_ASSISTANT_ID;
-            }
-
-            if (assistantId && assistantId !== 'your_openai_assistant_id_here' && assistantId !== 'your_custom_verification_assistant_id_here') {
-                console.log(`Using existing assistant ID from environment: ${assistantId}`);
-                this.assistantId = assistantId;
-                this.assistantCreated = true;
-                return assistantId;
-            }
-
-            // Create new assistant if none exists
-            console.log('Creating new OpenAI Assistant...');
-
-            let assistantConfig = {
-                name: "Invoice Translation Assistant",
-                description: "Professional assistant for translating invoices and comparing mismatches between original and translated invoices or between invoice and customs clearance documents.",
-                model: "gpt-4o-mini",
-                instructions: `You are a professional invoice translation assistant with expertise in:
-
-1. **Invoice Translation**: Translate invoice data while maintaining original structure and formatting
-2. **Currency Conversion**: Convert currency values to specified format while preserving numerical accuracy
-3. **Document Comparison**: Compare information between original and translated invoices
-4. **Customs Clearance**: Compare invoice data with customs clearance documents
-5. **Mismatch Detection**: Identify discrepancies between different documents
-
-**Key Responsibilities:**
-- Preserve all numerical data, dates, and business information accurately
-- Maintain professional formatting and structure
-- Ensure currency values are properly converted
-- Highlight any discrepancies or mismatches found
-- Provide clear, professional translations suitable for business use
-
-**Translation Guidelines:**
-- Keep technical terms and business terminology accurate
-- Maintain invoice numbering and reference formats
-- Preserve tax calculations and financial data
-- Use appropriate business language for the target market
-- Ensure compliance with local business practices
-
-**Comparison Guidelines:**
-- Systematically compare each field between documents
-- Highlight discrepancies in amounts, dates, descriptions
-- Flag missing or additional information
-- Provide clear summary of differences found
-- Suggest resolution for identified mismatches
-
-Always provide professional, accurate, and detailed responses suitable for business documentation.`,
-                tools: [
-                    {
-                        type: "file_search"
-                    },
-                    {
-                        type: "code_interpreter"
-                    }
-                ]
-            };
-
-            if (type === 'custom_declaration') {
-                assistantConfig.name = "Custom Declaration Verification Assistant";
-                assistantConfig.description = "Professional assistant for verifying customs declarations against invoice data.";
-                assistantConfig.instructions = `You are a professional customs declaration verification assistant with expertise in:
-                1. **Custom Declaration Analysis**: Extract customs declaration details, item classifications, values, and tariff codes
-2. **Invoice Cross-Reference**: Compare custom declaration data against ${invoices.length} invoice(s) for accuracy and compliance
-3. **Address Validation**: Cross-check billing addresses, shipping addresses, and consignee information
-4. **Item Verification**: Validate item counts, weights, dimensions, descriptions, and classifications
-5. **Value Validation**: Cross-reference total costs, unit prices, currency, and cost breakdowns
-6. **Compliance Check**: Ensure customs compliance, proper documentation, and regulatory adherence
-                `;
-                assistantConfig.tools = [
-                    { type: "file_search" },
-                    { type: "code_interpreter" },
-                    {
-                        type: "function", function: {
-                            name: "analyze_custom_declaration",
-                            description: "Analyze a customs declaration document and return a JSON object with the analysis results.",
-                            parameters: {
-                                type: "object",
-                                properties: {
-                                    customDeclaration: { type: "string", description: "The customs declaration document to analyze." }
-                                }
-                            }
-                        }
-                    }
-                ];
-            }
-
-            const assistant = await this.openai.beta.assistants.create(assistantConfig);
-
-            this.assistantId = assistant.id;
-            this.assistantCreated = true;
-
-            console.log(`✅ Assistant created successfully with ID: ${this.assistantId}`);
-            console.log(`💡 Add this to your .env file: OPENAI_ASSISTANT_ID=${this.assistantId}`);
-
-            return this.assistantId;
-
-        } catch (error) {
-            console.error('Error getting assistant ID:', error);
-            throw new Error(`Failed to get assistant ID: ${error.message}`);
-        }
+        const assistant = await this.getAssistantForTask(type);
+        console.log(`Using assistant '${assistant.name}' (${assistant.assistantId}) for type '${assistant.type}'`);
+        return assistant.assistantId;
     }
 
     /**
@@ -147,6 +105,34 @@ Always provide professional, accurate, and detailed responses suitable for busin
             console.error('Error creating OpenAI thread:', error);
             throw new Error(`Failed to create OpenAI thread: ${error.message}`);
         }
+    }
+
+    /**
+     * Ensure we have a usable thread ID. Creates (and optionally persists) a new one when absent.
+     * @param {Object} project - Project instance to persist thread ID on (optional)
+     * @param {string} threadId - Candidate thread ID
+     * @returns {Promise<string>}
+     */
+    async ensureThreadId(project, threadId) {
+        if (threadId && typeof threadId === 'string') {
+            return threadId;
+        }
+
+        if (project?.aiConversation && typeof project.aiConversation === 'string') {
+            return project.aiConversation;
+        }
+
+        const newThreadId = await this.createThread();
+
+        if (project && typeof project.update === 'function') {
+            try {
+                await project.update({ aiConversation: newThreadId });
+            } catch (error) {
+                console.warn(`⚠️  Failed to persist new thread ID for project ${project.id || ''}: ${error.message}`);
+            }
+        }
+
+        return newThreadId;
     }
 
 
@@ -498,6 +484,33 @@ Always provide professional, accurate, and detailed responses suitable for busin
         }
 
         console.log(`✅ File validation passed: ${fileName} (${fileSizeInMB.toFixed(2)} MB)`);
+    }
+
+    /**
+     * Attempt to extract searchable text from a courier receipt document
+     * @param {Object} courierReceipt
+     * @returns {Promise<string>}
+     */
+    async getCourierReceiptDocumentText(courierReceipt) {
+        if (!courierReceipt || !courierReceipt.filePath) {
+            return '';
+        }
+
+        try {
+            const absolutePath = path.join(__dirname, '..', courierReceipt.filePath);
+            const fileBuffer = await fsPromises.readFile(absolutePath);
+            const parsed = await pdfParse(fileBuffer);
+            const text = parsed?.text || '';
+
+            return text
+                .replace(/\r\n/g, '\n')
+                .replace(/\r/g, '\n')
+                .replace(/\n{3,}/g, '\n\n')
+                .trim();
+        } catch (error) {
+            console.warn(`⚠️  Failed to extract text from courier receipt ${courierReceipt.id || ''}: ${error.message}`);
+            return '';
+        }
     }
 
     /**
@@ -1036,8 +1049,9 @@ Always provide professional, accurate, and detailed responses suitable for busin
      * @param {string} threadId - OpenAI thread ID
      * @returns {Promise<Object>} - Analysis result object
      */
-    async extractCustomDeclarationDocument(project, customDeclaration, threadId) {
+    async extractCustomDeclarationDocument(project, customDeclaration, courierReceipts, threadId) {
         try {
+            threadId = await this.ensureThreadId(project, threadId);
 
             //check for customDeclaration.openAIFileId is not null
             if (!customDeclaration.openAIFileId) {
@@ -1049,19 +1063,6 @@ Always provide professional, accurate, and detailed responses suitable for busin
                 console.log(`Custom declaration file uploaded to OpenAI with ID: ${customDeclaration.openAIFileId}`);
             }
 
-
-            // Prepare comprehensive analysis data
-            const analysisData = {
-                project: {
-                    id: project.id,
-                    title: project.title,
-                    description: project.description
-                },
-                customDeclaration: {
-                    id: customDeclaration.openAIFileId,
-                },
-                analysisTimestamp: new Date().toISOString(),
-            };
             // Create comprehensive analysis instructions
 
             const extractCustomsDeclarationDataSchema = {
@@ -1413,12 +1414,15 @@ From Registration Declaration Part II:
         }
     }
 
-    async analyzeCustomDeclarationDocumentWithExistingFiles(project, customDeclaration, invoices, threadId) {
+    async analyzeCustomDeclarationDocumentWithExistingFiles(project, customDeclaration, invoices, courierReceipts, threadId) {
         try {
             console.log(`Starting comprehensive custom declaration analysis with existing files for project...`);
 
+            threadId = await this.ensureThreadId(project, threadId);
+
             const analysisInstructions = `{
   "invoices": [ ${_.map(invoices, "originalFileContent").join('\n')} ],
+  "courierReceipt": ${courierReceipts.fileContent},
   "declaration": { ${customDeclaration.originalFileContent} },
   "config": {
     "currencyConversionTolerancePercent": 0.5,
@@ -1648,260 +1652,593 @@ Follow these rules:
         }
     }
 
-    /**
-     * Analyze courier receipt document with content data
-     * @param {Object} project - Project object
-     * @param {Object} courierReceipt - Courier receipt object  
-     * @param {Array} invoices - Array of invoice objects with content data
-     * @param {string} threadId - OpenAI thread ID
-     * @returns {Promise<Object>} - Analysis result object
-     */
-    async analyzeCourierReceiptDocumentWithContentData(project, courierReceipt, invoices, threadId) {
+    async extractCourierShipmentData(courierReceipt, threadId) {
         try {
-            console.log(`Starting comprehensive courier receipt analysis with content data for project ${project.id}...`);
+            if (!threadId) {
+                throw new Error('Thread ID is required for courier shipment extraction');
+            }
 
-            // Prepare comprehensive analysis data
-            const analysisData = {
-                project: {
-                    id: project.id,
-                    title: project.title,
-                    description: project.description
-                },
-                courierReceipt: {
-                    id: courierReceipt.id,
-                    fileName: courierReceipt.fileName,
-                    filePath: courierReceipt.filePath,
-                    fileContent: courierReceipt.fileContent,
-                    openAIFileId: courierReceipt.openAIFileId,
-                    status: courierReceipt.status
-                },
-                invoices: invoices.map(invoice => ({
-                    id: invoice.id,
-                    fileName: invoice.fileName || invoice.originalFileName,
-                    originalFileContent: invoice.originalFileContent,
-                    translatedFileContent: invoice.translatedFileContent,
-                })),
-                analysisTimestamp: new Date().toISOString(),
-                invoiceCount: invoices.length
-            };
-
-            console.log(`Prepared analysis data for ${invoices.length} invoices and courier receipt ${courierReceipt.fileName}`);
-
-            // Create comprehensive analysis instructions
-            const analysisInstructions = `You are analyzing a courier receipt document against invoice data for comprehensive shipping and delivery verification.
-
-**Analysis Context:**
-- Project: ${project.title} (ID: ${project.id})
-- Courier Receipt: ${courierReceipt.fileName}
-- Invoice Count: ${invoices.length}
-- Analysis Type: Comprehensive content-based comparison
-
-**Primary Objectives:**
-1. **Courier Receipt Analysis**: Extract shipping information, delivery details, tracking data, and shipment specifics
-2. **Invoice Comparison**: Compare courier receipt data against ${invoices.length} invoice(s) for accuracy and consistency
-3. **Data Validation**: Identify discrepancies, missing information, and data mismatches
-4. **Comprehensive Insights**: Provide detailed analysis of shipping process, delivery status, and document conformity
-
-**Courier Receipt Focus Areas:**
-- Shipping carrier information and tracking numbers
-- Origin and destination addresses and routes
-- Package dimensions, weight, and contents
-- Delivery dates, status, and recipient information
-- Shipping costs, fees, and method details
-- Special instructions or handling requirements
-
-**Invoice Cross-Reference Analysis:**
-- Compare courier receipt shipping details with invoice amounts and descriptions
-- Verify recipient information matches between documents
-- Cross-check delivery dates with invoice dates and terms
-- Validate shipping costs alignment with invoice line items
-- Identify any package or item discrepancies
-
-**Response Format Requirements:**
-Provide a comprehensive JSON response with the following structure:
-{
-  "success": true,
-  "analysisType": "courier_receipt_with_content_data",
-  "timestamp": "ISO_TIMESTAMP",
-  "projectInfo": {
-    "id": PROJECT_ID,
-    "title": "PROJECT_TITLE"
-  },
-  "courierReceiptAnalysis": {
-    "fileName": "FILENAME",
-    "shippingInfo": {
-      "carrier": "Carrier name",
-      "trackingNumber": "Tracking number",
-      "shipDate": "Ship date",
-      "estimatedDelivery": "Estimated delivery date",
-      "actualDelivery": "Actual delivery date",
-      "deliveryStatus": "Status",
-      "packageCount": "Number of packages"
-    },
-    "routingInfo": {
-      "origin": "Origin address",
-      "destination": "Destination address", 
-      "route": "Expected route",
-      "distance": "Distance if available"
-    },
-    "packageDetails": {
-      "dimensions": "Package dimensions",
-      "weight": "Package weight",
-      "contents": "Package contents summary",
-      "value": "Declared value",
-      "specialInstructions": "Special handling instructions"
-    },
-    "costBreakdown": {
-      "shippingCost": "Primary shipping cost",
-      "fees": "Additional fees breakdown",
-      "totalCost": "Total shipping cost",
-      "method": "Shipping method used"
-    }
-  },
-  "invoiceComparison": {
-    "matchedInvoices": [
-      {
-        "invoiceId": INVOICE_ID,
-        "fileName": "INVOICE_FILENAME",
-        "correlationScore": "Similarity percentage",
-        "matches": [
-          "Specific matching criteria"
-        ],
-        "discrepancies": [
-          "Specific differences found"
-        ]
-      }
-    ],
-    "summary": {
-      "totalInvoicesAnalyzed": COUNT,
-      "successfulMatches": COUNT,
-      "dataConsistencyScore": "Overall consistency percentage",
-      "criticalDiscrepancies": COUNT,
-      "warnings": COUNT
-    }
-  },
-  "insights": {
-    "keyFindings": [
-      "Important discoveries from analysis"
-    ],
-    "recommendations": [
-      "Suggested actions based on findings"
-    ],
-    "riskAssessment": {
-      "riskLevel": "LOW|MEDIUM|HIGH",
-      "riskFactors": [
-        "Potential issues identified"
-      ],
-      "mitigationSuggestions": [
-        "Recommendations to address risks"
-      ]
-    }
-  },
-  "validationResults": {
-    "dataAccuracy": "Accuracy assessment",
-    "completenessScore": "How complete the data is",
-    "consistencyCheck": "Cross-document consistency",
-    "complianceStatus": "Compliance with shipping requirements"
-  },
-  "processingStats": {
-    "filesProcessed": COUNT,
-    "contentDataAnalyzed": COUNT,
-    "analysisDuration": "Processing time",
-    "timestamp": "Completion timestamp"
-  }
-}
-
-**Analysis Guidelines:**
-- Prioritize accuracy over speed
-- Provide specific, actionable insights
-- Highlight critical discrepancies that require attention
-- Maintain professional business language
-- Include quantitative assessments where possible
-- Suggest concrete next steps for any issues found
-
-Focus on providing comprehensive, detailed analysis that will help users understand shipping status, delivery verification, and document accuracy.`;
-
-            // Prepare attachments array with available files
             const attachments = [];
-
-            // Add courier receipt file if openAIFileId is available
             if (courierReceipt.openAIFileId) {
                 attachments.push({
                     file_id: courierReceipt.openAIFileId,
-                    tools: [{ "type": "file_search" }]
+                    tools: [{ type: 'file_search' }]
                 });
             }
 
-            // // Add invoice files if available
-            // invoices.forEach(invoice => {
-            //     if (invoice.openAIFileId) {
-            //         attachments.push({
-            //             file_id: invoice.openAIFileId,
-            //             tools: [{ "type": "file_search" }]
-            //         });
-            //     }
-            // });
+            let documentText = courierReceipt.fileContent || '';
+            if (typeof documentText === 'string') {
+                const trimmed = documentText.trim();
+                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                    documentText = '';
+                } else {
+                    documentText = trimmed;
+                }
+            } else {
+                documentText = '';
+            }
 
-            console.log(`Prepared ${attachments.length} file attachments for analysis`);
+            if (!documentText) {
+                const extractedText = await this.getCourierReceiptDocumentText(courierReceipt);
+                documentText = extractedText;
+            }
 
-            // Add message to thread with attachments
-            await this.addMessageToThread(threadId, analysisInstructions, attachments);
+            const MAX_CONTEXT_LENGTH = 12000;
+            if (documentText && documentText.length > MAX_CONTEXT_LENGTH) {
+                documentText = `${documentText.slice(0, MAX_CONTEXT_LENGTH)}\n\n[TRUNCATED_OCR_TEXT]`;
+            }
 
-            // Create run for analysis
-            const run = await this.createRun(threadId, analysisInstructions, 'custom_declaration');
+            const courierShipmentComprehensiveValidationSchema = {
+                name: "courier_shipment_data_extraction",
+                description: "Extracts structured courier shipment information from a courier receipt document.",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        document_metadata: {
+                            type: ["object", "null"],
+                            properties: {
+                                carrier_name: { type: ["string", "null"] },
+                                document_type: { type: ["string", "null"] },
+                                issue_date: { type: ["string", "null"] },
+                                tracking_numbers: {
+                                    type: "array",
+                                    items: { type: "string" },
+                                    default: []
+                                }
+                            },
+                            additionalProperties: false,
+                            default: {}
+                        },
+                        shipper: {
+                            type: ["object", "null"],
+                            properties: {
+                                name: { type: ["string", "null"] },
+                                address: { type: ["string", "null"] },
+                                city: { type: ["string", "null"] },
+                                postal_code: { type: ["string", "null"] },
+                                country: { type: ["string", "null"] },
+                            },
+                            additionalProperties: false,
+                            default: {}
+                        },
+                        consignee: {
+                            type: ["object", "null"],
+                            properties: {
+                                name: { type: ["string", "null"] },
+                                address: { type: ["string", "null"] },
+                                city: { type: ["string", "null"] },
+                                postal_code: { type: ["string", "null"] },
+                                country: { type: ["string", "null"] },
+                            },
+                            additionalProperties: false,
+                            default: {}
+                        },
+                        shipment_details: {
+                            type: ["object", "null"],
+                            properties: {
+                                routing_code: { type: ["string", "null"], description: "Service route code or logistics routing code like 'EURT PL-WAW-GTW P1NXL'" },
+                                routing_category: { type: ["string", "null"], description: "Customs / Commercial indicator like 'C'" },
+                                reference_number: { type: ["string", "null"], description: "Reference number like ' EJL/25-26/724-725-726-727'" },
+                                shipment_weight: { type: ["number", "null"], description: "Shipment weight in kilograms" },
+                                shipment_weight_unit: { type: ["string", "null"], description: "Shipment weight unit like 'kg'" },
+                                shipment_pieces: { type: ["number", "null"], description: "Shipment pieces example: 1/" },
+                                shipment_pack: { type: ["number", "null"], description: "Shipment volume in cubic meters example: /1" },
+                            },
+                            additionalProperties: false,
+                            default: {}
+                        },
+                        waybill_details: {
+                            type: ["object", "null"],
+                            properties: {
+                                waybill_number: { type: ["string", "null"], description: "Waybill number like 'WAYBILL 28 3102 1244'" },
+                                contents_description: { type: ["string", "null"], description: "Contents description like '18KT Gold & Silver Jewellery — Bracelets, Necklaces, Rings, Earrings'" },
+                                dispatch_code: { type: ["string", "null"], description: "Waybill time like '(2L)PL02174+48000001'" },
+                                post_tracking_reference_code: { type: ["string", "null"], description: "Post tracking reference like '(J) JD01 4600 0122 9646 831'" },
 
-            // Wait for completion
+                            },
+                            additionalProperties: false,
+                            default: {}
+                        },
+                        waybill_docs: {
+                            type: ["object", "null"],
+                            properties: {
+                                date_of_dispatch: { type: ["string", "null"], description: "Example '2025-01-01'" },
+                            },
+                            additionalProperties: false,
+                            default: {
+                                date_of_dispatch: null,
+                            }
+                        },
+                        shipper: {
+                            type: ["object", "null"],
+                            properties: {
+                                name: { type: ["string", "null"] },
+                                address: { type: ["string", "null"] },
+                                city: { type: ["string", "null"] },
+                                postal_code: { type: ["string", "null"] },
+                                country: { type: ["string", "null"] },
+                                contact: { type: ["string", "null"] },
+                            },
+                            additionalProperties: false,
+                            default: {}
+                        },
+                        receiver: {
+                            type: ["object", "null"],
+                            properties: {
+                                name: { type: ["string", "null"] },
+                                address: { type: ["string", "null"] },
+                                city: { type: ["string", "null"] },
+                                postal_code: { type: ["string", "null"] },
+                                country: { type: ["string", "null"] },
+                                contact: { type: ["string", "null"] },
+                            },
+                        },
+                        multi_leg_courier_routing: {
+                            type: ["object", "null"],
+                            properties: {
+                                routing_code: { type: ["string", "null"], description: "Service route code or logistics routing code like 'EURTIN-BOM-MPT PL-WAW-GTWP1NX'" },
+                                routing_origin: { type: ["string", "null"], description: "Routing origin like 'IN-BOM'" },
+                                routing_destination: { type: ["string", "null"], description: "Routing destination like 'PL-WAW'" },
+                                routing_service: { type: ["string", "null"], description: "Routing service like 'P1NX'" },
+                                routing_gateway: { type: ["string", "null"], description: "Routing gateway like 'GTW'" },
+                                routing_route_code: { type: ["string", "null"], description: "Routing route code like 'PL-WAW-GTW P1NXL'" },
+                                routing_description: { type: ["string", "null"], description: "Routing description like 'International shipment from India to Poland'" },
+                            },
+                        },
+                        product_details: {
+                            type: ["object", "null"],
+                            properties: {
+                                product_name: { type: ["string", "null"] }
+                            },
+                        },
+                        payer_details: {
+                            type: ["object", "null"],
+                            properties: {
+                                freight_account: { type: ["string", "null"], description: "Freight account number like '1234567890'" },
+                                duty_account: { type: ["string", "null"], description: "Duty account number like '1234567890' or text like ' Receiver Will Pay'" },
+                                taxes_account: { type: ["string", "null"], description: "Taxes account number like '1234567890' or text like ' Receiver Will Pay'" },
+                            },
+                            additionalProperties: false,
+                            default: {}
+                        },
+                        shipment_details: {
+                            type: ["object", "null"],
+                            properties: {
+                                reference_number: { type: ["string", "null"], description: "Reference number like ' EJL/25-26/724-725-726-727'" },
+                                custom_value: { type: ["number", "null"], description: "Shipment custom value like 1000.00" },
+                                custom_value_currency: { type: ["string", "null"], description: "Shipment custom value currency like 'USD'" },
+                                customs_declared_shipment_weight: { type: ["number", "null"], description: "Shipment customs declared weight in kilograms like 1000.00" },
+                                customs_declared_shipment_weight_unit: { type: ["string", "null"], description: "Shipment customs declared weight unit like 'kg'" },
+                                customs_declared_shipment_pieces: { type: ["number", "null"], description: "Shipment customs declared pieces example: 1/" },
+                                customs_declared_shipment_pack: { type: ["number", "null"], description: "Shipment customs declared volume in cubic meters example: /1" },
+                                customs_declarator_name: { type: ["string", "null"], description: "Shipment customs declarator name like 'John Doe'" },
+                                customs_declaration_date: { type: ["string", "null"], description: "Shipment customs declaration date like 'DD.MM.YYYY or DD/MM/YYYY'" },
+                            },
+                        },
+                    },
+                },
+                additionalProperties: false,
+                default: {}
+            };
+
+            let extractionPrompt = `
+                You are analyzing a courier shipment (waybill) document
+Task:
+- Extract following data from the courier shipment (waybill) file:
+Reference the courier receipt text enclosed between [COURIER_RECEIPT_TEXT_START] and [COURIER_RECEIPT_TEXT_END] and the attached document to answer.
+From Document Top Part I:
+    - carrier_name
+    - document_type
+    - issue_date
+    - tracking_numbers
+From Document "From" Part II:
+    - shipper_name
+    - shipper_address
+    - shipper_city
+    - shipper_postal_code
+    - shipper_country
+From Document "To" Part III:
+    - consignee_name
+    - consignee_address
+    - consignee_city
+    - consignee_postal_code
+    - consignee_country
+From Document "Shipment" Part IV:
+    - routing_code
+    - routing_category
+    - reference_number
+    - shipment_weight
+    - shipment_weight_unit
+    - shipment_pieces
+    - shipment_pack
+From Document "Waybill Details" Part V:
+    - waybill_number
+    - contents_description
+    - dispatch_code
+    - post_tracking_reference_code
+From Document "Waybill Docs" Part VI:
+    - date_of_dispatch
+From Document "Shipper" Part VII:
+    - name
+    - address
+    - city
+    - postal_code
+    - country
+    - contact
+From Document "Receiver" Part VIII:
+    - name
+    - address
+    - city
+    - postal_code
+    - country
+    - contact
+From Document "Multi Leg Courier Routing" Part IX:
+    - routing_code
+    - routing_origin
+    - routing_destination
+    - routing_service
+    - routing_gateway
+    - routing_route_code
+    - routing_description
+From Document "Product Details" Part X:
+    - product_name
+From Document "Payer Details" Part XI:
+    - freight_account
+    - duty_account
+    - taxes_account
+From Document "Shipment Details" Part XII:
+    - reference_number
+    - custom_value
+    - custom_value_currency
+    - customs_declared_shipment_weight
+    - customs_declared_shipment_weight_unit
+    - customs_declared_shipment_pieces
+    - customs_declared_shipment_pack
+    - customs_declarator_name
+    - customs_declaration_date
+    
+Extract structured courier shipment information strictly following the schema defined in the Courier Shipment Extraction Assistant.
+Return ONLY valid JSON. Do not include markdown, commentary, or additional text.
+If some values are missing, use null and list them in missing_fields`;
+
+            if (documentText) {
+                extractionPrompt += `\n\n[COURIER_RECEIPT_TEXT_START]\n${documentText}\n[COURIER_RECEIPT_TEXT_END]`;
+            }
+
+            await this.addMessageToThread(threadId, extractionPrompt, attachments, { validateFiles: true });
+
+            const run = await this.createRun(
+                threadId,
+                'Extract courier shipment data as JSON only.',
+                'courier_shipment',
+                { responseFormat: { type: 'json_schema', json_schema: { name: courierShipmentComprehensiveValidationSchema.name, schema: courierShipmentComprehensiveValidationSchema.parameters } }, temperature: 0 }
+            );
+
             const runStatus = await this.waitForRunCompletion(threadId, run.id);
-
             if (runStatus.status !== 'completed') {
                 const errorDetails = runStatus.last_error
                     ? `${runStatus.last_error.code}: ${runStatus.last_error.message}`
                     : 'No error details available';
-                throw new Error(`Analysis run failed with status: ${runStatus.status}. Details: ${errorDetails}`);
+                throw new Error(`Courier shipment extraction failed: ${errorDetails}`);
             }
 
-            // Get response messages
             const messages = await this.getThreadMessages(threadId);
+            const aiMessage = messages.find(message => message.role === 'assistant');
 
-            if (!messages || messages.length === 0) {
-                throw new Error('No analysis response received');
+            if (!aiMessage || !aiMessage.content || aiMessage.content.length === 0) {
+                throw new Error('No extraction response received from assistant');
             }
 
-            // Extract analysis response from AI
-            const aiMessage = messages[0];
-            let analysisResult = null;
+            const responseText = aiMessage.content
+                .map(part => (part?.text?.value || '').trim())
+                .join('\n')
+                .trim();
 
-            if (aiMessage.content && aiMessage.content.length > 0) {
-                const responseText = aiMessage.content[0].text.value;
-                console.log('Raw AI response received:', responseText.substring(0, 500) + '...');
-
-                analysisResult = this.extractJsonFromResponse(responseText);
-
-                if (!analysisResult) {
-                    // Fallback: create structured response from text
-                    analysisResult = {
-                        success: true,
-                        analysisType: "courier_receipt_with_content_data",
-                        rawResponse: responseText,
-                        timestamp: new Date().toISOString(),
-                        projectInfo: analysisData.project,
-                        processingStats: analysisData
-                    };
-                }
-            } else {
-                throw new Error('Invalid response format from AI');
+            if (!responseText) {
+                throw new Error('Assistant returned empty extraction response');
             }
 
-            console.log('✅ Comprehensive courier receipt analysis completed successfully');
+            const extractionResult = this.extractJsonFromResponse(responseText);
+            if (!extractionResult || typeof extractionResult !== 'object') {
+                throw new Error('Unable to parse extraction response as JSON');
+            }
 
             return {
                 success: true,
-                analysisData: analysisResult,
-                analyzedAt: new Date().toISOString(),
-                filesAnalyzed: attachments.length,
-                invoiceCount: invoices.length,
+                data: extractionResult,
+                rawResponse: responseText,
+                attachmentsUsed: attachments.length,
+                runId: run.id,
+                generatedAt: new Date().toISOString()
+            };
+        } catch (error) {
+            console.error('❌ Error extracting courier shipment data:', error);
+            return {
+                success: false,
+                error: error.message,
+                generatedAt: new Date().toISOString()
+            };
+        }
+    }
+
+    async validateCourierShipmentData(project, courierReceipt, invoices, extractedData, threadId) {
+        try {
+            if (!threadId) {
+                throw new Error('Thread ID is required for courier shipment validation');
+            }
+
+            if (!extractedData) {
+                throw new Error('Extracted courier shipment data is required for validation');
+            }
+
+            if (!Array.isArray(invoices) || invoices.length === 0) {
+                throw new Error('No invoices available for validation');
+            }
+
+            const attachments = [];
+
+
+            const invoiceDataset = invoices.map(invoice => {
+                let parsedContent = null;
+                try {
+                    parsedContent = invoice.originalFileContent
+                        ? JSON.parse(invoice.originalFileContent)
+                        : null;
+                } catch (parseError) {
+                    parsedContent = invoice.originalFileContent || null;
+                }
+
+                return {
+                    projectId: invoice.projectId,
+                    content: parsedContent
+                };
+            });
+
+            const courierShipmentDataset = {
+                projectId: courierReceipt.projectId,
+                content: JSON.stringify(extractedData)
+            };
+
+            const courierShipmentAndInvoiceValidationSchema = {
+                name: "courier_shipment_and_invoice_validation",
+                description: "Validates a courier shipment JSON against a provided invoice dataset.",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        validationSummary: {
+                            type: "object",
+                            properties: {
+                                overallMatchScore: { type: "number" },
+                                overallStatus: { type: "string" },
+                                overallRiskLevel: { type: "string" },
+                                remarks: { type: "string" },
+                                keyFindings: { type: "array", items: { type: "string" } }
+                            },
+                        },
+                        fieldValidations: {
+                            type: "array",
+                            items: {
+                                type: "object",
+                                properties: {
+                                    fieldName: { type: "string" },
+                                    valueInInvoice: { type: "string" },
+                                    valueInCourierShipment: { type: "string" },
+                                    matchScore: { type: "number" },
+                                    status: { type: "string" },
+                                    notes: { type: "string" },
+                                }
+                            }
+                        },
+                        invoiceCrossChecks: {
+                            type: "array",
+                            items: {
+                                type: "object",
+                                properties: {
+                                    invoiceId: { type: "number" },
+                                    invoiceNumber: { type: "string", description: "Invoice number like 'EJL/25-26/449'" },
+                                    matchScore: { type: "number" },
+                                    matchedFields: { type: "array", items: { type: "string" } },
+                                    discrepancies: { type: "array", items: { type: "string" } },
+                                }
+                            }
+                        },
+                        shipperValidation: {
+                            type: "object",
+                            properties: {
+                                nameMatchScore: { type: "number" },
+                                items: {
+                                    type: "array",
+                                    items: {
+                                        type: "object",
+                                        properties: {
+                                            fieldValueInInvoice: { type: "string" },
+                                            fieldValueInCourierShipment: { type: "string" },
+                                            matchScore: { type: "number" },
+                                            status: { type: "string" },
+                                            notes: { type: "string" },
+                                        }
+
+                                    }
+                                }
+                            }
+                        },
+                        receiverValidation: {
+                            type: "object",
+                            properties: {
+                                nameMatchScore: { type: "number" },
+                                items: {
+                                    type: "array",
+                                    items: {
+                                        type: "object",
+                                        properties: {
+                                            fieldValueInInvoice: { type: "string" },
+                                            fieldValueInCourierShipment: { type: "string" },
+                                            matchScore: { type: "number" },
+                                            status: { type: "string" },
+                                            notes: { type: "string" },
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        totalInvoiceAmountValidation: {
+                            type: "object",
+                            properties: {
+                                matchScore: { type: "number" },
+                                discrepancies: { type: "array", items: { type: "string" } },
+                            }
+                        },
+                        totalInvoiceAmountCurrencyValidation: {
+                            type: "object",
+                            properties: {
+                                matchScore: { type: "number" },
+                                discrepancies: { type: "array", items: { type: "string" } },
+                            }
+                        },
+                        totalShipmentWeightValidation: {
+                            type: "object",
+                            properties: {
+                                matchScore: { type: "number" },
+                                discrepancies: { type: "array", items: { type: "string" } },
+                            }
+                        },
+                        riskAssessment: {
+                            type: "object",
+                            properties: {
+                                level: { type: "string" },
+                                issues: { type: "array", items: { type: "string" }, description: "Issues like 'Fraud detected', 'Tax evasion', 'Customs compliance issues'" },
+                                recommendedActions: { type: "array", items: { type: "string" }, description: "Recommended actions like 'Review the shipment', 'Contact the customs authority', 'Contact the freight forwarder'" },
+                            }
+                        },
+                        metadata: {
+                            type: "object",
+                            properties: {
+                                projectId: { type: "number" },
+                                courierReceiptId: { type: "number" },
+                                generatedAt: { type: "string" },
+                            }
+                        }
+                    },
+                    additionalProperties: false,
+                    default: {}
+                }
+            };
+            const validationPrompt = `
+            Task:
+            - Validate the extracted courier shipment JSON against the provided invoice dataset.
+            - For Multiple Invoice Number consider Invoice in courier shipment incrementally and validate with the invoice number Example For 3 invoices EJL/25-26/449, EJL/25-26/450, EJL/25-26/451. Invoice number in courier shipment is EJL/25-26/449-450-451 format.
+            - For amount validation validate total amount of invoice with the total amount of courier shipment with matching currency.
+            - For weight validation validate total weight of invoice with the total weight of courier shipment with matching weight unit.
+            - For Shipper and Receiver validation validate the name, address, city, postal code, country, contact with the shipper and receiver in the invoice.
+            - Reference the courier receipt text enclosed between [COURIER_RECEIPT_TEXT_START] and [COURIER_RECEIPT_TEXT_END] and the attached document to answer.
+            - Use strict JSON output with the structure:
+            ${courierShipmentAndInvoiceValidationSchema}
+            - Courier Shipment Dataset:
+            ${courierShipmentDataset}
+            - Invoice Dataset:
+            ${invoiceDataset}
+            - Respond with JSON only. Base all comparisons on the provided extracted data and invoices.`;
+
+            await this.addMessageToThread(threadId, validationPrompt, attachments, { validateFiles: true });
+
+            const run = await this.createRun(
+                threadId,
+                'Validate courier shipment JSON against invoices and return structured validation report.',
+                'custom_declaration',
+                { responseFormat: { type: 'json_schema', json_schema: { name: courierShipmentAndInvoiceValidationSchema.name, schema: courierShipmentAndInvoiceValidationSchema.parameters } }, temperature: 0 }
+            );
+
+            const runStatus = await this.waitForRunCompletion(threadId, run.id);
+            if (runStatus.status !== 'completed') {
+                const errorDetails = runStatus.last_error
+                    ? `${runStatus.last_error.code}: ${runStatus.last_error.message}`
+                    : 'No error details available';
+                throw new Error(`Courier shipment validation failed: ${errorDetails}`);
+            }
+
+            const messages = await this.getThreadMessages(threadId);
+            const aiMessage = messages.find(message => message.role === 'assistant');
+
+            if (!aiMessage || !aiMessage.content || aiMessage.content.length === 0) {
+                throw new Error('No validation response received from assistant');
+            }
+
+            const responseText = aiMessage.content
+                .map(part => (part?.text?.value || '').trim())
+                .join('\n')
+                .trim();
+
+            if (!responseText) {
+                throw new Error('Assistant returned empty validation response');
+            }
+
+            const validationResult = this.extractJsonFromResponse(responseText);
+            if (!validationResult || typeof validationResult !== 'object') {
+                throw new Error('Unable to parse validation response as JSON');
+            }
+
+            return {
+                success: true,
+                data: validationResult,
+                rawResponse: responseText,
+                attachmentsUsed: attachments.length,
+                runId: run.id,
+                generatedAt: new Date().toISOString()
+            };
+        } catch (error) {
+            console.error('❌ Error validating courier shipment data:', error);
+            return {
+                success: false,
+                error: error.message,
+                generatedAt: new Date().toISOString()
+            };
+        }
+    }
+
+    async analyzeCourierReceiptDocumentWithContentData(project, courierReceipt, invoices, threadId) {
+        try {
+            console.log(`Starting courier receipt two-phase analysis for project ${project.id}...`);
+
+            const extraction = await this.extractCourierShipmentData(courierReceipt, threadId);
+            let validation = {
+                success: false,
+                error: 'Validation skipped due to extraction failure',
+                generatedAt: new Date().toISOString()
+            };
+            if (extraction.success) {
+
+                validation = await this.validateCourierShipmentData(project, courierReceipt, invoices, extraction.data, threadId);
+            }
+
+            const aggregateSuccess = extraction.success && validation.success;
+
+            return {
+                success: aggregateSuccess,
                 projectId: project.id,
-                courierReceiptId: courierReceipt.id
+                courierReceiptId: courierReceipt.id,
+                extraction,
+                validation,
+                analyzedAt: new Date().toISOString()
             };
 
         } catch (error) {
@@ -1909,12 +2246,19 @@ Focus on providing comprehensive, detailed analysis that will help users underst
 
             return {
                 success: false,
-                error: error.message,
-                analyzedAt: new Date().toISOString(),
-                filesAnalyzed: 0,
-                invoiceCount: 0,
                 projectId: project.id,
-                courierReceiptId: courierReceipt.id
+                courierReceiptId: courierReceipt.id,
+                extraction: {
+                    success: false,
+                    error: error.message,
+                    generatedAt: new Date().toISOString()
+                },
+                validation: {
+                    success: false,
+                    error: error.message,
+                    generatedAt: new Date().toISOString()
+                },
+                analyzedAt: new Date().toISOString()
             };
         }
     }

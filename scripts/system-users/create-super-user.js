@@ -1,6 +1,6 @@
-const { sequelize } = require('../db');
-const { User } = require('../models/user-model');
-const { Group } = require('../models/group-model');
+const { sequelize } = require('../../db');
+const { User } = require('../../models/user-model');
+const { Group } = require('../../models/group-model');
 const crypto = require('crypto');
 require('dotenv').config();
 

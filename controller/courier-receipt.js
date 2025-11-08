@@ -471,8 +471,6 @@ const controller = {
         );
       }
 
-      console.log("project", project);
-
       const courierReceipt = await CourierReceipt.findOne({
         where: { projectId: project.id },
         order: [['createdAt', 'DESC']]

@@ -9,16 +9,19 @@ const _ = require("lodash");
 const activityHelper = require("../helper/activityHelper");
 const openAIHelper = require("../helper/openai-helper");
 const openAIService = require("../services/openai-service");
+const { CourierReceipt } = require("../models/courier-receipt-model");
 const controller = {
   // Reusable function to analyze custom declaration
-  analyzeCustomDeclaration: async function (customDeclaration, project, invoices) {
+  analyzeCustomDeclaration: async function (customDeclaration, project, invoices, courierReceipts) {
     try {
       // Check if custom declaration has required file
       if (!customDeclaration.filePath || !customDeclaration.fileName) {
         throw new Error("Custom declaration file is missing");
       }
 
-
+      if (!courierReceipts) {
+        throw new Error("Courier receipt is missing");
+      }
 
       if (invoices.length === 0) {
         throw new Error("No invoices with OpenAI file IDs found for this project. Custom declaration analysis requires invoices that have been uploaded to OpenAI for comparison.");
@@ -36,7 +39,7 @@ const controller = {
       // The analysis will update the insights field when complete
 
       // Start comprehensive analysis in background
-      const analysisPromise = openAIService.extractCustomDeclarationDocument(project, customDeclaration, threadId);
+      const analysisPromise = openAIService.extractCustomDeclarationDocument(project, customDeclaration, courierReceipts, threadId);
 
       //console.log('analysisPromise', analysisPromise);
       // Handle the promise to avoid unhandled promise rejection
@@ -52,7 +55,7 @@ const controller = {
             await customDeclaration.update({ originalFileContent: JSON.stringify(result.analysisResult) });
 
 
-            const analysisResult = await openAIService.analyzeCustomDeclarationDocumentWithExistingFiles(project, customDeclaration, invoices, threadId);
+            const analysisResult = await openAIService.analyzeCustomDeclarationDocumentWithExistingFiles(project, customDeclaration, invoices, courierReceipts, threadId);
             if (analysisResult.success && analysisResult.analysisResult) {
               console.log(`✅ Insights successfully updated for custom declaration `);
               await customDeclaration.update({ insights: JSON.stringify(analysisResult.analysisResult), status: "completed" });
@@ -569,8 +572,15 @@ const controller = {
         order: [['createdAt', 'DESC']]
       });
 
+      const courierReceipts = await CourierReceipt.findOne({
+        where: {
+          projectId: project.id
+        },
+        order: [['createdAt', 'DESC']]
+      });
+
       // Use the reusable analysis function
-      const result = await controller.analyzeCustomDeclaration(customDeclaration, project, invoices);
+      const result = await controller.analyzeCustomDeclaration(customDeclaration, project, invoices, courierReceipts);
 
       // Log analysis activity
       try {
@@ -652,9 +662,15 @@ const controller = {
         },
         order: [['createdAt', 'DESC']]
       });
+      const courierReceipts = await CourierReceipt.findOne({
+        where: {
+          projectId: project.id
+        },
+        order: [['createdAt', 'DESC']]
+      });
 
       // Use the reusable analysis function
-      const result = await controller.analyzeCustomDeclaration(customDeclaration, project, invoices);
+      const result = await controller.analyzeCustomDeclaration(customDeclaration, project, invoices, courierReceipts);
 
       // Log activity
       await activityHelper.logActivity({

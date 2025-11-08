@@ -3,9 +3,8 @@
  * Generates an OpenAI assistant ID for custom-declaration document validation with invoice files
  */
 
-const OpenAIAssistantManager = require('./openai-assistant-manager');
-const fs = require('fs').promises;
-const path = require('path');
+const OpenAIAssistantManager = require('./invoice-translator');
+const { Assistant } = require('../../models/assistant-model');
 require('dotenv').config();
 
 
@@ -30,73 +29,32 @@ Your job: given one or more invoice JSON objects and one customs declaration JSO
     }
 };
 
-/**
- * Save assistant configuration to a dedicated config file
- * @param {Object} assistant - Assistant object
- * @returns {Promise<void>}
- */
-async function saveCustomVerificationConfig(assistant) {
+async function persistAssistantRecord(assistant) {
     try {
-        const configPath = path.join(__dirname, '../config/custom-verification-assistant.json');
+        const assistantType = 'custom_declaration';
 
-        const config = {
+        await Assistant.update(
+            { isActive: false },
+            { where: { type: assistantType, isActive: true } }
+        );
+
+        const record = await Assistant.create({
+            type: assistantType,
             assistantId: assistant.id,
             name: assistant.name,
-            model: assistant.model,
             description: assistant.description,
+            model: assistant.model,
             instructions: assistant.instructions,
-            tools: assistant.tools,
-            metadata: assistant.metadata,
-            createdAt: assistant.created_at,
-            updatedAt: new Date().toISOString()
-        };
+            tools: assistant.tools || [],
+            metadata: assistant.metadata || {},
+            version: CUSTOM_VERIFICATION_CONFIG?.metadata?.version || null,
+            isActive: true,
+        });
 
-        await fs.writeFile(configPath, JSON.stringify(config, null, 2));
-        console.log('💾 Custom verification assistant configuration saved to:', configPath);
-
-        return config;
+        console.log('💾 Custom verification assistant stored in database with ID:', record.id);
+        return record;
     } catch (error) {
-        console.error('❌ Error saving custom verification config:', error.message);
-        throw error;
-    }
-}
-
-/**
- * Update environment file with custom verification assistant ID
- * @param {string} assistantId - Assistant ID
- * @returns {Promise<void>}
- */
-async function updateEnvFile(assistantId) {
-    const envFilePath = path.join(__dirname, '../.env');
-
-    try {
-        let envContent = '';
-        let envFileExists = false;
-
-        try {
-            envContent = await fs.readFile(envFilePath, 'utf8');
-            envFileExists = true;
-        } catch (error) {
-            if (error.code !== 'ENOENT') throw error;
-        }
-
-        // Update or add CUSTOM_VERIFICATION_ASSISTANT_ID
-        const assistantIdRegex = /^CUSTOM_VERIFICATION_ASSISTANT_ID=.*$/m;
-        const newAssistantLine = `CUSTOM_VERIFICATION_ASSISTANT_ID=${assistantId}`;
-
-        if (envFileExists && assistantIdRegex.test(envContent)) {
-            envContent = envContent.replace(assistantIdRegex, newAssistantLine);
-        } else {
-            if (envFileExists && !envContent.endsWith('\n')) {
-                envContent += '\n';
-            }
-            envContent += `${newAssistantLine}\n`;
-        }
-
-        await fs.writeFile(envFilePath, envContent);
-        console.log('🔧 Environment file updated with custom verification assistant ID');
-    } catch (error) {
-        console.error('❌ Error updating environment file:', error.message);
+        console.error('❌ Error saving custom verification assistant to database:', error.message);
         throw error;
     }
 }
@@ -118,14 +76,9 @@ async function main() {
 
         const manager = new OpenAIAssistantManager();
 
-        // Create the assistant
         const assistant = await manager.createAssistant(CUSTOM_VERIFICATION_CONFIG);
 
-        // Save the configuration
-        await saveCustomVerificationConfig(assistant);
-
-        // Update environment file
-        await updateEnvFile(assistant.id);
+        await persistAssistantRecord(assistant);
 
         console.log('='.repeat(60));
         console.log('✅ Custom Document Verification Assistant created successfully!');
@@ -133,9 +86,7 @@ async function main() {
         console.log(`📋 Assistant ID: ${assistant.id}`);
         console.log(`📋 Name: ${assistant.name}`);
         console.log(`📋 Model: ${assistant.model}`);
-        console.log(`\n💡 Add this to your .env file:`);
-        console.log(`   CUSTOM_VERIFICATION_ASSISTANT_ID=${assistant.id}`);
-        console.log('\n⚠️  Please restart your application to use the new assistant');
+        console.log('\n💾 Assistant stored in database under type: custom_declaration');
         console.log('='.repeat(60));
 
         return assistant.id;

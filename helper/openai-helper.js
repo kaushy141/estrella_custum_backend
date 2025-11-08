@@ -222,7 +222,8 @@ Rules:
             try {
                 uploadedFile = await openAIService.uploadFile(fullFilePath, courierReceipt.fileName);
                 await CourierReceipt.update({ openAIFileId: uploadedFile.id }, { where: { id: courierReceipt.id } });
-                //await Invoice.save();
+                // Keep the in-memory instance in sync so downstream steps can access the file immediately
+                courierReceipt.openAIFileId = uploadedFile.id;
                 console.log(`File uploaded to OpenAI with ID: ${uploadedFile.id}`);
             } catch (uploadError) {
                 console.log(`File upload failed (${uploadError.message}), continuing without file attachment`);
@@ -242,7 +243,7 @@ Rules:
             const invoices = await Invoice.findAll({
                 where: {
                     projectId: project.id,
-                    openAIFileId: { [Op.ne]: null } // Only invoices that have been uploaded to OpenAI
+                    originalFileContent: { [Op.ne]: null } // Only invoices that have been uploaded to OpenAI
                 },
                 order: [['createdAt', 'DESC']]
             });
@@ -250,41 +251,69 @@ Rules:
             console.log(`Found ${invoices.length} invoices for courier receipt analysis`);
 
             // Use the new comprehensive analysis function that includes content data
+            await CourierReceipt.update(
+                { status: "processing" },
+                { where: { id: courierReceipt.id } }
+            );
+
             const aiResponse = await openAIService.analyzeCourierReceiptDocumentWithContentData(project, courierReceipt, invoices, threadId);
 
-            console.log(`Comprehensive analysis completed successfully for courier receipt: ${courierReceipt.fileName}`);
+            console.log(`Two-phase analysis completed for courier receipt: ${courierReceipt.fileName}`);
 
-            // Update courier receipt with enhanced insights and verification
-            if (aiResponse.success && aiResponse.analysisData) {
+            if (aiResponse.extraction?.success && aiResponse.extraction.data) {
+                const extractionPayload = JSON.stringify(aiResponse.extraction.data);
 
+                await CourierReceipt.update(
+                    {
+                        fileContent: extractionPayload,
+                        status: "processing"
+                    },
+                    { where: { id: courierReceipt.id } }
+                );
 
-                console.log(`Updating courier receipt ${courierReceipt.id} with comprehensive insights...`);
-                console.log('Analysis data structure:', {
-                    success: aiResponse.success,
-                    hasAnalysisData: !!aiResponse.analysisData,
-                    analysisType: aiResponse.analysisData?.analysisType,
-                    filesAnalyzed: aiResponse.filesAnalyzed,
-                    invoiceCount: aiResponse.invoiceCount,
-                    analyzedAt: aiResponse.analyzedAt
-                });
-
-                // Create comprehensive insights structure for courier receipt
-                const insightsData = {
-                    ...aiResponse.analysisData,
+                console.log(`✅ Extraction data stored for courier receipt ${courierReceipt.id} (length: ${extractionPayload.length} chars)`);
+            } else if (aiResponse.extraction && !aiResponse.extraction.success) {
+                const extractionErrorInsights = {
+                    success: false,
+                    stage: "courier_shipment_extraction",
+                    error: aiResponse.extraction.error,
                     metadata: {
-                        analysisType: "courier_receipt_comprehensive_analysis",
+                        courierReceiptId: courierReceipt.id,
+                        projectId: project.id,
+                        generatedAt: aiResponse.extraction.generatedAt
+                    }
+                };
+
+                await CourierReceipt.update(
+                    {
+                        status: "failed",
+                        insights: JSON.stringify(extractionErrorInsights)
+                    },
+                    { where: { id: courierReceipt.id } }
+                );
+
+                console.log(`❌ Extraction failed for courier receipt ${courierReceipt.id}: ${aiResponse.extraction.error}`);
+                return aiResponse;
+            }
+
+            if (aiResponse.validation?.success && aiResponse.validation.data) {
+                const insightsData = {
+                    ...aiResponse.validation.data,
+                    metadata: {
+                        ...(aiResponse.validation.data.metadata || {}),
+                        analysisType: "courier_shipment_validation",
                         courierReceiptId: courierReceipt.id,
                         courierReceiptFileName: courierReceipt.fileName,
                         projectId: project.id,
                         projectTitle: project.title,
-                        filesAnalyzed: aiResponse.filesAnalyzed || 0,
-                        invoiceCount: aiResponse.invoiceCount || 0,
-                        analyzedAt: aiResponse.analyzedAt,
-                        generatedBy: "OpenAI Assistant with Content Data Analysis"
+                        invoicesAnalyzed: invoices.length,
+                        extractionRunId: aiResponse.extraction?.runId || null,
+                        validationRunId: aiResponse.validation.runId || null,
+                        generatedAt: aiResponse.validation.generatedAt || new Date().toISOString()
                     }
                 };
 
-                const updateResult = await CourierReceipt.update(
+                await CourierReceipt.update(
                     {
                         insights: JSON.stringify(insightsData),
                         status: "completed"
@@ -292,42 +321,30 @@ Rules:
                     { where: { id: courierReceipt.id } }
                 );
 
-                console.log(`Courier receipt ${courierReceipt.id} update result:`, updateResult);
-
-
-
-                // Verify the update by fetching the record
-                const updatedRecord = await CourierReceipt.findByPk(courierReceipt.id);
-                if (updatedRecord) {
-                    console.log(`✅ Verification: Courier receipt ${courierReceipt.id} updated successfully`);
-                    console.log(`✅ Verification: Status changed to: ${updatedRecord.status}`);
-                    console.log(`✅ Verification: Insights field length: ${updatedRecord.insights ? updatedRecord.insights.length : 'null'} characters`);
-
-                    if (updatedRecord.insights) {
-                        try {
-                            const parsedInsights = JSON.parse(updatedRecord.insights);
-                            console.log(`✅ Verification: Insights contain ${Object.keys(parsedInsights).length} main sections`);
-                            console.log(`✅ Verification: Analysis type: ${parsedInsights.analysisType || 'unknown'}`);
-                            console.log(`✅ Verification: Files analyzed: ${parsedInsights.metadata?.filesAnalyzed || 0}`);
-                            console.log(`✅ Verification: Invoice count: ${parsedInsights.metadata?.invoiceCount || 0}`);
-                        } catch (e) {
-                            console.log(`⚠️ Verification: Insights field exists but could not parse JSON: ${e.message}`);
-                        }
+                console.log(`✅ Validation insights stored for courier receipt ${courierReceipt.id}`);
+            } else if (aiResponse.validation) {
+                const validationErrorInsights = {
+                    success: false,
+                    stage: "courier_shipment_validation",
+                    error: aiResponse.validation.error,
+                    metadata: {
+                        courierReceiptId: courierReceipt.id,
+                        projectId: project.id,
+                        invoicesAnalyzed: invoices.length,
+                        generatedAt: aiResponse.validation.generatedAt || new Date().toISOString(),
+                        extractionSucceeded: !!aiResponse.extraction?.success
                     }
-                } else {
-                    console.log(`❌ Verification failed: Could not fetch updated courier receipt ${courierReceipt.id}`);
-                }
-            } else {
-                console.log('AI Response conditions not met for courier receipt insights update:');
-                console.log('- success:', aiResponse.success);
-                console.log('- analysisData:', aiResponse.analysisData ? 'present' : 'missing');
-                console.log('- Full response structure:', {
-                    success: aiResponse.success,
-                    hasAnalysisData: !!aiResponse.analysisData,
-                    analyzedAt: aiResponse.analyzedAt,
-                    filesAnalyzed: aiResponse.filesAnalyzed,
-                    error: aiResponse.error
-                });
+                };
+
+                await CourierReceipt.update(
+                    {
+                        insights: JSON.stringify(validationErrorInsights),
+                        status: "failed"
+                    },
+                    { where: { id: courierReceipt.id } }
+                );
+
+                console.log(`❌ Validation failed for courier receipt ${courierReceipt.id}: ${aiResponse.validation.error}`);
             }
 
             return aiResponse;
