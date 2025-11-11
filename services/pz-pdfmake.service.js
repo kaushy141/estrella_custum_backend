@@ -2,17 +2,14 @@ const fs = require('fs');
 const path = require('path');
 const PdfPrinter = require('pdfmake');
 
-const fonts = {
+const defaultFonts = {
     Roboto: {
-        normal: path.join(__dirname, '..', 'node_modules', 'pdfmake', 'examples', 'fonts', 'Roboto-Regular.ttf'),
-        bold: path.join(__dirname, '..', 'node_modules', 'pdfmake', 'examples', 'fonts', 'Roboto-Medium.ttf'),
-        italics: path.join(__dirname, '..', 'node_modules', 'pdfmake', 'examples', 'fonts', 'Roboto-Italic.ttf'),
-        bolditalics: path.join(__dirname, '..', 'node_modules', 'pdfmake', 'examples', 'fonts', 'Roboto-MediumItalic.ttf')
+        normal: 'Helvetica',
+        bold: 'Helvetica-Bold',
+        italics: 'Helvetica-Oblique',
+        bolditalics: 'Helvetica-BoldOblique'
     }
 };
-
-const printer = new PdfPrinter(fonts);
-
 /**
  * Generate a PZ document PDF using pdfmake/react-pdfmake compatible definition.
  * @param {Object} params
@@ -44,11 +41,16 @@ async function generatePZDocumentPdfmake({ info = {}, items = [], outputPath }) 
         signatures = {}
     } = info;
 
+    const fonts = info.fonts || defaultFonts;
+    const printerInstance = new PdfPrinter(fonts);
+
     const recipientText = buildPartyBlock(recipient);
     const supplierText = buildPartyBlock(supplier);
     const resolvedLogo = resolveLogoSource(logo, logoPath);
 
     const computedTotals = calculateTotals(items, totals, currency);
+
+    const tableColumnWidths = [22, '*', 40, 45, 60, 35, 60, 60];
 
     const itemsBody = [
         [
@@ -72,20 +74,6 @@ async function generatePZDocumentPdfmake({ info = {}, items = [], outputPath }) 
             { text: formatCurrency(item.grossAmount ?? item.grossTotal ?? item.gross, currency), alignment: 'right' }
         ])
     ];
-
-    const totalsSection = (computedTotals.net != null || computedTotals.gross != null)
-        ? {
-            style: 'summaryTable',
-            table: {
-                widths: ['*', 'auto'],
-                body: [
-                    ...(computedTotals.net != null ? [['Razem netto', formatCurrency(computedTotals.net, currency)]] : []),
-                    ...(computedTotals.gross != null ? [['Razem brutto', formatCurrency(computedTotals.gross, currency)]] : [])
-                ]
-            },
-            layout: 'lightHorizontalLines'
-        }
-        : null;
 
     const content = [];
 
@@ -162,7 +150,7 @@ async function generatePZDocumentPdfmake({ info = {}, items = [], outputPath }) 
                 widths: ['*', '*'],
                 body: summaryRows.map(row => [
                     row.label || '',
-                    row.value || ''
+                    { text: formatCurrency(row.value, currency) || '', alignment: 'right' }
                 ])
             },
             layout: 'lightHorizontalLines',
@@ -172,22 +160,47 @@ async function generatePZDocumentPdfmake({ info = {}, items = [], outputPath }) 
 
     content.push({
         table: {
-            widths: [20, '*', 40, 40, 60, 40, 70, 70],
+            widths: tableColumnWidths,
             body: itemsBody
         },
         layout: {
             hLineWidth: () => 0.7,
             vLineWidth: () => 0.7,
-            paddingLeft: () => 4,
-            paddingRight: () => 4,
-            paddingTop: () => 3,
-            paddingBottom: () => 3
+            paddingLeft: () => 3,
+            paddingRight: () => 3,
+            paddingTop: () => 4,
+            paddingBottom: () => 4
         },
         margin: [0, 0, 0, 15]
     });
 
-    if (totalsSection) {
-        content.push(totalsSection);
+    if (computedTotals.net != null || computedTotals.gross != null) {
+        content.push({
+            columns: [
+                { width: '*', text: '' },
+                {
+                    width: 'auto',
+                    table: {
+                        widths: ['auto', 'auto'],
+                        body: [
+                            ...(computedTotals.net != null ? [['Razem netto', formatCurrency(computedTotals.net, currency)]] : []),
+                            ...(computedTotals.gross != null ? [['Razem brutto', formatCurrency(computedTotals.gross, currency)]] : [])
+                        ]
+                    },
+                    layout: {
+                        hLineWidth: () => 0.7,
+                        vLineWidth: () => 0.7,
+                        paddingLeft: () => 6,
+                        paddingRight: () => 6,
+                        paddingTop: () => 4,
+                        paddingBottom: () => 4
+                    },
+                    style: 'summaryTable'
+                }
+            ],
+            columnGap: 12,
+            margin: [0, 8, 0, 0]
+        });
     }
 
     if (notes) {
@@ -300,7 +313,7 @@ async function generatePZDocumentPdfmake({ info = {}, items = [], outputPath }) 
     await ensureDirectoryExists(path.dirname(outputPath));
 
     await new Promise((resolve, reject) => {
-        const pdfDoc = printer.createPdfKitDocument(docDefinition);
+        const pdfDoc = printerInstance.createPdfKitDocument(docDefinition);
         const stream = fs.createWriteStream(outputPath);
 
         pdfDoc.pipe(stream);

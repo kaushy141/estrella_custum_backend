@@ -10,6 +10,8 @@ const _ = require("lodash");
 const path = require('path');
 const { CustomDeclaration } = require("../models/custom-declaration-model");
 const { CourierReceipt } = require("../models/courier-receipt-model");
+const { Invoice } = require("../models/invoice-model");
+const { generatePZDocumentPdfmake } = require("../services/pz-pdfmake.service");
 const controller = {
   // Create new custom clearance
   create: async function (req, res) {
@@ -691,13 +693,13 @@ const controller = {
           null
         );
       }
-
+      const taxRate = 23;
       const allItems = invoices.map(invoice => JSON.parse(invoice.translatedFileContent).items).flat().map(item => ({
         name: item.description + " " + item.category,
         unit: item.UOM,
         quantity: item.quantity,
         unitPrice: item.unitPrice.toFixed(2),
-        taxRate: 23 + "%",
+        taxRate: taxRate + "%",
         netTotal: item.total.toFixed(2),
         grossTotal: (item.total * (1 + taxRate / 100)).toFixed(2)
       })).flat();
@@ -736,16 +738,16 @@ const controller = {
         documentNumber: customDeclarationData.Certified_Customs_Declaration_Part_I.Message_ID,
         issueDate: new Date().toLocaleDateString('pl-PL'),
         warehouse: group.name || 'Default Warehouse',
-        recipient: { ...courierShipmentData.consignee, postalCode: courierShipmentData.consignee.postal_code },
-        supplier: { ...courierShipmentData.shipper, postalCode: courierShipment.shipper.postal_code },
+        recipient: { ...courierShipmentData.consignee, postalCode: courierShipmentData.consignee?.postal_code },
+        supplier: { ...courierShipmentData.shipper, postalCode: courierShipmentData.shipper?.postal_code },
         currency: project.exchangeCurrency,
         notes: `${courierShipmentData.shipment_details.reference_number} Dated: ${courierShipmentData.document_metadata.issue_date}`,
         notesLabel: 'Uwagi',
         totals: { net: allItems.reduce((acc, item) => acc + item.netTotal, 0), gross: allItems.reduce((acc, item) => acc + item.grossTotal, 0) },
         summaryRows: [
-          { label: 'Total Net', value: allItems.reduce((acc, item) => acc + item.netTotal, 0) },
-          { label: 'Total Gross', value: allItems.reduce((acc, item) => acc + item.grossTotal, 0) },
-          { label: 'Total Tax', value: allItems.reduce((acc, item) => acc + item.taxTotal, 0) }
+          { label: 'Total Net', value: allItems.reduce((acc, item) => acc + parseFloat(item.netTotal), 0).toFixed(2) },
+          { label: 'Total Gross', value: allItems.reduce((acc, item) => acc + parseFloat(item.grossTotal), 0).toFixed(2) },
+          // { label: 'Total Tax', value: allItems.reduce((acc, item) => acc + parseFloat(item.taxTotal), 0).toFixed(2) }
         ],
         footerText: " Wydruk pochodzi z systemu wFirma.pl wersja 25.",
         signatures: {
@@ -766,7 +768,7 @@ const controller = {
       const outputPath = path.join(outputDir, fileName);
 
       const pzDocumentData = await generatePZDocumentPdfmake({
-        pdfInfo,
+        info: pdfInfo,
         items: allItems,
         outputPath: outputPath
       });
@@ -776,8 +778,8 @@ const controller = {
         projectId: project.id,
         groupId: group.id,
         filePath: outputPath,
-        //fileContent: pzDocumentData.fileContent,
-        //insights: pzDocumentData.insights,
+        fileContent: JSON.stringify(pdfInfo),
+        insights: "PZ document generated successfully",
         openAIFileId: null // Not using OpenAI for PZ generation
       });
 
@@ -795,8 +797,7 @@ const controller = {
         status: "success",
         data: {
           customClearance: customClearance,
-          fileName: pzDocumentData.fileName,
-          filePath: pzDocumentData.filePath
+          filePath: outputPath
         },
         message: "PZ document generated and saved successfully"
       };
