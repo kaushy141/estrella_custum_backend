@@ -8,6 +8,8 @@ const pzDocumentGenerator = require("../services/pz-document-generator.service")
 const activityHelper = require("../helper/activityHelper");
 const _ = require("lodash");
 const path = require('path');
+const { CustomDeclaration } = require("../models/custom-declaration-model");
+const { CourierReceipt } = require("../models/courier-receipt-model");
 const controller = {
   // Create new custom clearance
   create: async function (req, res) {
@@ -680,18 +682,102 @@ const controller = {
         );
       }
 
-      console.log(`Generating PZ document for project ${projectId}, group ${groupId}`);
+      const invoices = await Invoice.findAll({ where: { projectId: project.id, groupId: group.id } });
+      if (!invoices || invoices.length === 0) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "No invoices found for this project",
+          null
+        );
+      }
+
+      const allItems = invoices.map(invoice => JSON.parse(invoice.translatedFileContent).items).flat().map(item => ({
+        name: item.description + " " + item.category,
+        unit: item.UOM,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice.toFixed(2),
+        taxRate: 23 + "%",
+        netTotal: item.total.toFixed(2),
+        grossTotal: (item.total * (1 + taxRate / 100)).toFixed(2)
+      })).flat();
+
+      const customDeclaration = await CustomDeclaration.findOne({ where: { projectId: project.id, groupId: group.id }, order: [['createdAt', 'DESC']] });
+      if (!customDeclaration) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "No custom declaration found for this project",
+          null
+        );
+      }
+
+      const courierShipment = await CourierReceipt.findOne({ where: { projectId: project.id, groupId: group.id }, order: [['createdAt', 'DESC']] });
+
+      if (!courierShipment) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "No courier shipment found for this project",
+          null
+        );
+      }
+
+      const customDeclarationData = JSON.parse(customDeclaration.originalFileContent);
+
+      const courierShipmentData = JSON.parse(courierShipment.fileContent);
 
       // Generate PZ document
-      const pzDocumentData = await pzDocumentGenerator.generatePZDocument(project.id, group.id);
+      // const pzDocumentData = await pzDocumentGenerator.generatePZDocument(project.id, group.id);
+      const pdfInfo = {
+        logo: group.logo,
+        logoPath: group.logoPath,
+        documentTitle: "Custom Clearance PZ Document",
+        documentNumber: customDeclarationData.Certified_Customs_Declaration_Part_I.Message_ID,
+        issueDate: new Date().toLocaleDateString('pl-PL'),
+        warehouse: group.name || 'Default Warehouse',
+        recipient: { ...courierShipmentData.consignee, postalCode: courierShipmentData.consignee.postal_code },
+        supplier: { ...courierShipmentData.shipper, postalCode: courierShipment.shipper.postal_code },
+        currency: project.exchangeCurrency,
+        notes: `${courierShipmentData.shipment_details.reference_number} Dated: ${courierShipmentData.document_metadata.issue_date}`,
+        notesLabel: 'Uwagi',
+        totals: { net: allItems.reduce((acc, item) => acc + item.netTotal, 0), gross: allItems.reduce((acc, item) => acc + item.grossTotal, 0) },
+        summaryRows: [
+          { label: 'Total Net', value: allItems.reduce((acc, item) => acc + item.netTotal, 0) },
+          { label: 'Total Gross', value: allItems.reduce((acc, item) => acc + item.grossTotal, 0) },
+          { label: 'Total Tax', value: allItems.reduce((acc, item) => acc + item.taxTotal, 0) }
+        ],
+        footerText: " Wydruk pochodzi z systemu wFirma.pl wersja 25.",
+        signatures: {
+          issuedBy: "Issuer Name",
+          receivedBy: "Receiver Name"
+        }
+      };
+
+
+      // Prepare output directory (similar to invoice translation pattern)
+      const outputDir = path.join('media', 'declaration', customDeclaration.guid.substring(0, 1));
+      const fs = require('fs');
+      fs.mkdirSync(outputDir, { recursive: true });
+
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const fileName = `PZ-${project.title.replace(/[^a-zA-Z0-9]/g, '_')}-${timestamp}.pdf`;
+      const outputPath = path.join(outputDir, fileName);
+
+      const pzDocumentData = await generatePZDocumentPdfmake({
+        pdfInfo,
+        items: allItems,
+        outputPath: outputPath
+      });
 
       // Create CustomClearance record
       const customClearance = await CustomClearance.create({
         projectId: project.id,
         groupId: group.id,
-        filePath: pzDocumentData.filePath,
-        fileContent: pzDocumentData.fileContent,
-        insights: pzDocumentData.insights,
+        filePath: outputPath,
+        //fileContent: pzDocumentData.fileContent,
+        //insights: pzDocumentData.insights,
         openAIFileId: null // Not using OpenAI for PZ generation
       });
 
