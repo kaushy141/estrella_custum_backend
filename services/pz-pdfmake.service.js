@@ -56,7 +56,7 @@ async function generatePZDocumentPdfmake({ info = {}, items = [], outputPath }) 
         { text: 'Lp.', style: 'tableHeader', alignment: 'center' },
         { text: 'Nazwa', style: 'tableHeader' },
         { text: 'Jedn', style: 'tableHeader', alignment: 'center' },
-        { text: 'Ilość', style: 'tableHeader', alignment: 'right' },
+        { text: 'Ilość', style: 'tableHeader', alignment: 'center' },
         { text: 'Cena netto', style: 'tableHeader', alignment: 'right' },
         { text: 'Stawka', style: 'tableHeader', alignment: 'center' },
         { text: 'Wartość netto', style: 'tableHeader', alignment: 'right' },
