@@ -50,7 +50,7 @@ async function generatePZDocumentPdfmake({ info = {}, items = [], outputPath }) 
 
     const computedTotals = calculateTotals(items, totals, currency);
 
-    const tableColumnWidths = [22, 160, 40, 42, 62, 34, 56, 54]; // total 470pt to respect margins
+    const tableColumnWidths = [20, 165, 38, 42, 60, 32, 55, 43]; // total 455pt to respect margins
 
     const headerRow = [
         { text: 'Lp.', style: 'tableHeader', alignment: 'center' },
