@@ -50,7 +50,7 @@ async function generatePZDocumentPdfmake({ info = {}, items = [], outputPath }) 
 
     const computedTotals = calculateTotals(items, totals, currency);
 
-    const tableColumnWidths = [24, 190, 38, 48, 66, 34, 55, 66]; // total 521pt, fits within printable width
+    const tableColumnWidths = [25, 190, 40, 45, 65, 35, 60, 55]; // total 515pt, exactly matches printable width
 
     const itemsBody = [
         [
