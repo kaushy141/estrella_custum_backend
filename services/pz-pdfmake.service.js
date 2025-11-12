@@ -50,7 +50,7 @@ async function generatePZDocumentPdfmake({ info = {}, items = [], outputPath }) 
 
     const computedTotals = calculateTotals(items, totals, currency);
 
-    const tableColumnWidths = [25, 190, 40, 45, 65, 35, 60, 55]; // total 515pt, exactly matches printable width
+    const tableColumnWidths = [24, 170, 42, 45, 65, 36, 60, 53]; // total 495pt to respect margins
 
     const headerRow = [
         { text: 'Lp.', style: 'tableHeader', alignment: 'center' },
@@ -66,18 +66,19 @@ async function generatePZDocumentPdfmake({ info = {}, items = [], outputPath }) 
     const itemsBody = [
         headerRow,
         ...items.map((item, index) => [
-            { text: String(index + 1), alignment: 'center', margin: [0, 2, 0, 2] },
+            { text: String(index + 1), alignment: 'center', fontSize: 8, margin: [0, 2, 0, 2] },
             {
                 text: item.name || item.description || '',
                 alignment: 'left',
+                fontSize: 8,
                 margin: [0, 2, 0, 2]
             },
-            { text: item.unit || item.uom || '', alignment: 'center', margin: [0, 2, 0, 2] },
-            { text: formatNumber(item.quantity), alignment: 'right', margin: [0, 2, 0, 2] },
-            { text: formatCurrency(item.unitPrice, currency), alignment: 'right', margin: [0, 2, 0, 2] },
-            { text: item.taxRate ? `${item.taxRate}` : '23%', alignment: 'center', margin: [0, 2, 0, 2] },
-            { text: formatCurrency(item.netAmount ?? item.netTotal ?? item.net, currency), alignment: 'right', margin: [0, 2, 0, 2] },
-            { text: formatCurrency(item.grossAmount ?? item.grossTotal ?? item.gross, currency), alignment: 'right', margin: [0, 2, 0, 2] }
+            { text: item.unit || item.uom || '', alignment: 'center', fontSize: 8, margin: [0, 2, 0, 2] },
+            { text: formatNumber(item.quantity), alignment: 'right', fontSize: 8, margin: [0, 2, 0, 2] },
+            { text: formatCurrency(item.unitPrice, currency), alignment: 'right', fontSize: 8, margin: [0, 2, 0, 2] },
+            { text: item.taxRate ? `${item.taxRate}` : '23%', alignment: 'center', fontSize: 8, margin: [0, 2, 0, 2] },
+            { text: formatCurrency(item.netAmount ?? item.netTotal ?? item.net, currency), alignment: 'right', fontSize: 8, margin: [0, 2, 0, 2] },
+            { text: formatCurrency(item.grossAmount ?? item.grossTotal ?? item.gross, currency), alignment: 'right', fontSize: 8, margin: [0, 2, 0, 2] }
         ])
     ];
 
@@ -172,10 +173,10 @@ async function generatePZDocumentPdfmake({ info = {}, items = [], outputPath }) 
         layout: {
             hLineWidth: () => 0.7,
             vLineWidth: () => 0.7,
-            paddingLeft: (rowIndex) => (rowIndex === 0 ? 4 : 4),
-            paddingRight: (rowIndex) => (rowIndex === 0 ? 4 : 4),
-            paddingTop: (rowIndex) => (rowIndex === 0 ? 4 : 6),
-            paddingBottom: () => 6
+            paddingLeft: (rowIndex) => (rowIndex === 0 ? 4 : 3),
+            paddingRight: (rowIndex) => (rowIndex === 0 ? 4 : 3),
+            paddingTop: (rowIndex) => (rowIndex === 0 ? 4 : 5),
+            paddingBottom: () => 4
         },
         margin: [0, 0, 0, 15]
     });
