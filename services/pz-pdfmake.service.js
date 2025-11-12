@@ -52,26 +52,32 @@ async function generatePZDocumentPdfmake({ info = {}, items = [], outputPath }) 
 
     const tableColumnWidths = [25, 190, 40, 45, 65, 35, 60, 55]; // total 515pt, exactly matches printable width
 
+    const headerRow = [
+        { text: 'Lp.', style: 'tableHeader', alignment: 'center' },
+        { text: 'Nazwa', style: 'tableHeader' },
+        { text: 'Jedn', style: 'tableHeader', alignment: 'center' },
+        { text: 'Ilość', style: 'tableHeader', alignment: 'right' },
+        { text: 'Cena netto', style: 'tableHeader', alignment: 'right' },
+        { text: 'Stawka', style: 'tableHeader', alignment: 'center' },
+        { text: 'Wartość netto', style: 'tableHeader', alignment: 'right' },
+        { text: 'Wartość brutto', style: 'tableHeader', alignment: 'right' }
+    ];
+
     const itemsBody = [
-        [
-            { text: 'Lp.', style: 'tableHeader', alignment: 'center' },
-            { text: 'Nazwa', style: 'tableHeader' },
-            { text: 'Jedn', style: 'tableHeader', alignment: 'center' },
-            { text: 'Ilość', style: 'tableHeader', alignment: 'right' },
-            { text: 'Cena netto', style: 'tableHeader', alignment: 'right' },
-            { text: 'Stawka', style: 'tableHeader', alignment: 'center' },
-            { text: 'Wartość netto', style: 'tableHeader', alignment: 'right' },
-            { text: 'Wartość brutto', style: 'tableHeader', alignment: 'right' }
-        ],
+        headerRow,
         ...items.map((item, index) => [
-            { text: String(index + 1), alignment: 'center' },
-            { text: item.name || item.description || '' },
-            { text: item.unit || item.uom || '', alignment: 'center' },
-            { text: formatNumber(item.quantity), alignment: 'right' },
-            { text: formatCurrency(item.unitPrice, currency), alignment: 'right' },
-            { text: item.taxRate ? `${item.taxRate}` : '23%', alignment: 'center' },
-            { text: formatCurrency(item.netAmount ?? item.netTotal ?? item.net, currency), alignment: 'right' },
-            { text: formatCurrency(item.grossAmount ?? item.grossTotal ?? item.gross, currency), alignment: 'right' }
+            { text: String(index + 1), alignment: 'center', margin: [0, 2, 0, 2] },
+            {
+                text: item.name || item.description || '',
+                alignment: 'left',
+                margin: [0, 2, 0, 2]
+            },
+            { text: item.unit || item.uom || '', alignment: 'center', margin: [0, 2, 0, 2] },
+            { text: formatNumber(item.quantity), alignment: 'right', margin: [0, 2, 0, 2] },
+            { text: formatCurrency(item.unitPrice, currency), alignment: 'right', margin: [0, 2, 0, 2] },
+            { text: item.taxRate ? `${item.taxRate}` : '23%', alignment: 'center', margin: [0, 2, 0, 2] },
+            { text: formatCurrency(item.netAmount ?? item.netTotal ?? item.net, currency), alignment: 'right', margin: [0, 2, 0, 2] },
+            { text: formatCurrency(item.grossAmount ?? item.grossTotal ?? item.gross, currency), alignment: 'right', margin: [0, 2, 0, 2] }
         ])
     ];
 
@@ -166,10 +172,10 @@ async function generatePZDocumentPdfmake({ info = {}, items = [], outputPath }) 
         layout: {
             hLineWidth: () => 0.7,
             vLineWidth: () => 0.7,
-            paddingLeft: (rowIndex) => (rowIndex === 0 ? 4 : 3),
-            paddingRight: (rowIndex) => (rowIndex === 0 ? 4 : 3),
-            paddingTop: (rowIndex) => (rowIndex === 0 ? 4 : 5),
-            paddingBottom: () => 4
+            paddingLeft: (rowIndex) => (rowIndex === 0 ? 4 : 4),
+            paddingRight: (rowIndex) => (rowIndex === 0 ? 4 : 4),
+            paddingTop: (rowIndex) => (rowIndex === 0 ? 4 : 6),
+            paddingBottom: () => 6
         },
         margin: [0, 0, 0, 15]
     });
