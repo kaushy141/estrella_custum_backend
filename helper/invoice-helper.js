@@ -184,6 +184,18 @@ const generateTranslatedInvoiceFile = async (filePath, invoiceData) => {
     };
 
     // Static fields (mirror extract positions)
+    set('A1', "FAKTURA");
+    set('A3', "Kupiec-eksporter:");
+    set('F3', "Numer i data faktury");
+    set('I3', "Numer referencyjny eksportera:");
+    set('A9', "Odbiorca:");
+    set('F9', "Nabywca (Kupujący (jeśli inny niż odbiorca):");
+    set('F19', "Warunki dostawy i płatności:");
+    set('F20', "Warunki");
+    set('F21', "Bankier");
+    set('B24', "Liczba i rodzaj opakowań.");
+    set('E24', "Opis towaru Kod HSN");
+    set('H24', "Ilość");
     set('F4', invoiceData.invoiceNumber);
     set('F4', invoiceData.date);
     set('I4', invoiceData.exportReference);
@@ -243,17 +255,31 @@ const generateTranslatedInvoiceFile = async (filePath, invoiceData) => {
     set(`J${totalsBase + 2}`, invoiceData.totalInsuranceAmount);
     set(`J${totalsBase + 3}`, invoiceData.totalCIFAmount);
 
+    set(`A${row + 3}`, "DOSTAWA  PRZEZNACZONA  NA  EKSPORT  LIST  ZOBOWIĄZAŃ  BEZ");
+    set(`A${row + 6}`, "Ubezpieczenie obejmuje dostawę tej przesyłki „od drzwi do drzwi");
+    set(`A${row + 7}`, worksheet.getCell(`A${row + 7}`).value.replace("by", "przez"));
+    set(`J${row + 24}`, invoiceData.itemsHeaderLabelAmount);
+
     set(`B${row + 10}`, invoiceData.conversionRate);
     set(`I${row + 11}`, invoiceData.totalValueLabel);
     set(`B${row + 11}`, invoiceData.totalValue);
     set(`B${row + 13}`, invoiceData.totalValueWords);
 
+    set(`A${row + 15}`, "Szczegóły");
+    set(`A${row + 16}`, "Nazwa banku");
+    set(`A${row + 17}`, "Adres");
+    set(`A${row + 18}`, "Numer konta");
+    set(`A${row + 19}`, "Kod SWIFT");
+    set(`A${row + 20}`, "Kod rozliczeniowy");
+
+    set(`C${row + 15}`, "Dane banku beneficjenta");
     set(`C${row + 16}`, invoiceData.beneficiaryBankName);
     set(`C${row + 17}`, invoiceData.beneficiaryBankAddress);
     set(`C${row + 18}`, invoiceData.beneficiaryBankAccountNumber);
     set(`C${row + 19}`, invoiceData.beneficiaryBankSwiftCode);
     set(`C${row + 20}`, invoiceData.beneficiaryBankClearingCode);
 
+    set(`H${row + 15}`, "Dane banku korespondencyjnego");
     set(`H${row + 16}`, invoiceData.correspondentBankName);
     set(`H${row + 17}`, invoiceData.correspondentBankAddress);
     set(`H${row + 18}`, invoiceData.correspondentBankAccountNumber);
@@ -261,13 +287,20 @@ const generateTranslatedInvoiceFile = async (filePath, invoiceData) => {
     set(`H${row + 20}`, invoiceData.correspondentBankClearingCode);
     set(`A${row + 21}`, invoiceData.manufacturingDeclaration);
 
+    set(`A${row + 22}`, `(1)  Diamenty  objęte  niniejszą  fakturą  zostały  zakupione  z  legalnych  źródeł,  niezwiązanych  z  finansowaniem  konfliktów,  zgodnie  z  Rozporządzeniem  Organizacji  Narodów  Zjednoczonych  i  odpowiednimi  przepisami  krajowymi.  Sprzedawca  niniejszym  gwarantuje,  że  diamenty  te  są  wolne  od  konfliktów  i  potwierdza  zgodność  z  
+Wytycznymi  WDC  SoW.
+ 2)  Diamenty  objęte  niniejszą  fakturą  są  wyłącznie  pochodzenia  naturalnego  i  nie  są  poddawane  obróbce,  zgodnie  z  wiedzą  osobistą  i/lub  pisemnymi  gwarancjami  udzielonymi  przez  dostawców  tych  diamentów.  Przyjęcie  towarów  objętych  niniejszą  fakturą  będzie  zgodne  z  wytycznymi  WFDB.
+ Oświadczamy,  że  wystawione  na  fakturę  diamenty  nie  pochodzą  z  Rosji.`);
     set(`A${row + 23}`, invoiceData.marksAndNos);
     set(`B${row + 26}`, invoiceData.invoiceJSANumber);
+    set(`H${row + 23}`, "Podpis  i  data");
     set(`H${row + 25}`, invoiceData.signatureForImporter);
     set(`H${row + 29}`, invoiceData.signatureDate);
     set(`J${row + 28}`, invoiceData.signaturePersonName);
     set(`J${row + 29}`, invoiceData.signaturePersonDesignation);
 
+    set(`A${row + 27}`, "Oświadczamy, że faktura ta przedstawia rzeczywistą cenę towaru.");
+    set(`A${row + 28}`, `opisane i że wszystkie szczegóły są prawdziwe i poprawne.`);
     await workbook.xlsx.writeFile(outPath);
     return outPath;
 }
