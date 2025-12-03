@@ -15,6 +15,8 @@ const extractInvoiceData = async (filePath) => {
         const merchantExporter = xlsxHelper.getCellValue('A4');
         const consignee = xlsxHelper.getCellValue('A10');
         const buyer = xlsxHelper.getCellValue('F10');
+        const buyerOrderNumberDate = xlsxHelper.getCellValue('F4');
+        const otherReferences = xlsxHelper.getCellValue('F7');
         const preCarriageBy = xlsxHelper.getCellValue('A18');
         const placeOfReceipt = xlsxHelper.getCellValue('C18');
         const vesselNumber = xlsxHelper.getCellValue('A20');
@@ -77,6 +79,7 @@ const extractInvoiceData = async (filePath) => {
         const totalValue = totalValueInfo?.result || totalValueInfo;
         const totalValueWords = xlsxHelper.getCellValue(`B${row + 13}`);
 
+        const otherPaymentDetails = xlsxHelper.getCellValue(`A${row + 15}`);
         const beneficiaryBankName = xlsxHelper.getCellValue(`C${row + 16}`);
         const beneficiaryBankAddress = xlsxHelper.getCellValue(`C${row + 17}`);
         const beneficiaryBankAccountNumber = xlsxHelper.getCellValue(`C${row + 18}`);
@@ -104,6 +107,8 @@ const extractInvoiceData = async (filePath) => {
             merchantExporter,
             consignee,
             buyer,
+            buyerOrderNumberDate,
+            otherReferences,
             preCarriageBy,
             placeOfReceipt,
             vesselNumber,
@@ -136,6 +141,7 @@ const extractInvoiceData = async (filePath) => {
             totalValueLabel,
             totalValue,
             totalValueWords,
+            otherPaymentDetails,
             beneficiaryBankName,
             beneficiaryBankAddress,
             beneficiaryBankAccountNumber,
@@ -187,6 +193,8 @@ const generateTranslatedInvoiceFile = async (filePath, invoiceData) => {
     set('A1', "FAKTURA");
     set('A3', "Kupiec-eksporter:");
     set('F3', "Numer i data faktury");
+    set('F4', invoiceData.buyerOrderNumberDate);
+    set('F7', invoiceData.otherReferences);
     set('I3', "Numer referencyjny eksportera:");
     set('A9', "Odbiorca:");
     set('F9', "Nabywca (Kupujący (jeśli inny niż odbiorca):");
@@ -256,6 +264,7 @@ const generateTranslatedInvoiceFile = async (filePath, invoiceData) => {
     set(`J${totalsBase + 3}`, invoiceData.totalCIFAmount);
 
     set(`A${row + 3}`, "DOSTAWA  PRZEZNACZONA  NA  EKSPORT  LIST  ZOBOWIĄZAŃ  BEZ");
+    set(`A${row + 5}`, invoiceData.otherPaymentDetails);
     set(`A${row + 6}`, "Ubezpieczenie obejmuje dostawę tej przesyłki „od drzwi do drzwi");
     set(`A${row + 7}`, worksheet.getCell(`A${row + 7}`).value.replace("by", "przez"));
     set(`J${row + 24}`, invoiceData.itemsHeaderLabelAmount);
