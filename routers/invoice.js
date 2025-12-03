@@ -32,6 +32,8 @@ router.get("/project/:projectId", authenticateToken, invoiceController.getByProj
 router.get("/group/:groupId", authenticateToken, invoiceController.getByGroup);
 
 // Translate invoice
+router.post("/translate/file/:id", authenticateToken, invoiceController.translateFile);
+
 router.post("/translate/:id", authenticateToken, invoiceController.translate);
 
 module.exports = router;

@@ -569,6 +569,108 @@ const controller = {
     }
   },
 
+  translateFile: async function (req, res) {
+    try {
+      const { id } = req.params;
+
+      const invoice = await Invoice.findOne({ where: { guid: id } });
+      if (!invoice) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Invoice not found",
+          null
+        );
+      }
+
+      let project = await Project.findOne({ where: { id: invoice.projectId } });
+      if (!project) {
+        return sendResponseWithData(
+          res,
+          ErrorCode.NOT_FOUND,
+          "Project not found",
+          null
+        );
+      }
+
+      const projectInvoices = await Invoice.findAll({
+        where: { id: invoice.id },
+      });
+      // Create thread ID if it doesn't exist
+      let threadId = project.aiConversation;
+      if (!threadId) {
+        threadId = await openAIHelper.createConversationId();
+        // Update project with new thread ID
+        await project.update({ aiConversation: threadId });
+      }
+
+      // Process invoices sequentially to avoid concurrent run conflicts
+      for (const invoice of projectInvoices) {
+        try {
+          console.log(`Processing invoice ${invoice.id} for project ${project.id}...`);
+
+          await invoice.update(
+            {
+              status: "processing",
+            },
+            {
+              where: { id: invoice.id },
+            }
+          );
+
+          // Process translation sequentially (not in parallel)
+          await openAIHelper.translateInvoice({
+            id: invoice.id,
+            originalFilePath: invoice.originalFilePath,
+            originalFileName: invoice.originalFileName,
+            originalFileContent: invoice.originalFileContent,
+            language: project.language,
+            translatedLanguage: project.translatedLanguage,
+            currency: project.currency,
+            exchangeCurrency: project.exchangeCurrency,
+            exchangeRate: project.exchangeRate,
+          }, threadId);
+
+          console.log(`✅ Completed translation for invoice ${invoice.id}`);
+        } catch (invoiceError) {
+          console.error(`❌ Error processing invoice ${invoice.id}:`, invoiceError.message);
+
+          // Update invoice status to failed 
+          try {
+            await invoice.update(
+              {
+                status: "failed",
+                insights: invoiceError.message,
+              },
+              {
+                where: { id: invoice.id },
+              }
+            );
+          } catch (updateError) {
+            console.error(`Failed to update invoice ${invoice.id} status:`, updateError.message);
+          }
+
+          // Continue with next invoice instead of stopping the entire process
+          continue;
+        }
+      }
+      return sendResponseWithData(
+        res,
+        SuccessCode.SUCCESS,
+        "Invoice translated successfully",
+        null
+      );
+    } catch (err) {
+      console.log("sdfsdfsdf", err);
+      return sendResponseWithData(
+        res,
+        ErrorCode.REQUEST_FAILED,
+        "Unable to translate invoice",
+        err
+      );
+    }
+  },
+
   // Download original invoice file by ID or GUID
   downloadOriginalById: async function (req, res) {
     try {
