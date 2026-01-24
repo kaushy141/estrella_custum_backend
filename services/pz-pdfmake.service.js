@@ -26,6 +26,7 @@ async function generatePZDocumentPdfmake({ info = {}, items = [], outputPath }) 
     const {
         logo,
         logoPath,
+        companyTitle,
         documentTitle,
         documentNumber,
         issueDate,
@@ -84,30 +85,27 @@ async function generatePZDocumentPdfmake({ info = {}, items = [], outputPath }) 
 
     const content = [];
 
-    if (resolvedLogo) {
-        content.push({
-            image: resolvedLogo,
-            width: 140,
-            alignment: 'left',
-            margin: [0, 0, 0, 10]
-        });
-    }
-
+    // Header with logo on left and document info table on right
     content.push({
         columns: [
             {
-                width: '*',
+                width: 'auto',
                 stack: [
-                    { text: 'Odbiorca', style: 'label' },
-                    { text: recipientText || 'Brak danych', style: 'field' }
+                    ...(resolvedLogo ? [{
+                        image: resolvedLogo,
+                        width: 100,
+                        margin: [0, 0, 0, 5]
+                    }] : []),
+                    ...(companyTitle ? [{
+                        text: companyTitle,
+                        style: 'companyTitle',
+                        margin: [0, 0, 0, 0]
+                    }] : [])
                 ]
             },
             {
                 width: '*',
-                stack: [
-                    { text: 'Dostawca', style: 'label' },
-                    { text: supplierText || 'Brak danych', style: 'field' }
-                ]
+                text: ''
             },
             {
                 width: 'auto',
@@ -137,6 +135,28 @@ async function generatePZDocumentPdfmake({ info = {}, items = [], outputPath }) 
                     paddingTop: () => 3,
                     paddingBottom: () => 3
                 }
+            }
+        ],
+        columnGap: 16,
+        margin: [0, 0, 0, 20]
+    });
+
+    // Recipient and Supplier information
+    content.push({
+        columns: [
+            {
+                width: '*',
+                stack: [
+                    { text: 'Odbiorca', style: 'label' },
+                    { text: recipientText || 'Brak danych', style: 'field' }
+                ]
+            },
+            {
+                width: '*',
+                stack: [
+                    { text: 'Dostawca', style: 'label' },
+                    { text: supplierText || 'Brak danych', style: 'field' }
+                ]
             }
         ],
         columnGap: 16,
@@ -251,6 +271,11 @@ async function generatePZDocumentPdfmake({ info = {}, items = [], outputPath }) 
             title: {
                 fontSize: 16,
                 bold: true
+            },
+            companyTitle: {
+                fontSize: 18,
+                bold: true,
+                margin: [0, 5, 0, 0]
             },
             label: {
                 fontSize: 9,

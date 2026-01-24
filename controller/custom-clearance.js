@@ -733,7 +733,8 @@ const controller = {
       // const pzDocumentData = await pzDocumentGenerator.generatePZDocument(project.id, group.id);
       const pdfInfo = {
         logo: group.logo,
-        logoPath: group.logoPath,
+        logoPath: path.join('media', 'default.png'),
+        companyTitle: "Estrella Jewels",
         documentTitle: "Custom Clearance PZ Document",
         documentNumber: customDeclarationData.Certified_Customs_Declaration_Part_I.Message_ID,
         issueDate: new Date().toLocaleDateString('pl-PL'),
